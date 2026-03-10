@@ -20,9 +20,9 @@ export default {
         },
       },
       fontFamily: {
-        display: ['Georgia', 'serif'],
-        body:    ['Arial', 'sans-serif'],
-        mono:    ['Courier New', 'monospace'],
+        display: ['Fraunces', 'Times New Roman', 'serif'],
+        body:    ['Manrope', 'Avenir Next', 'sans-serif'],
+        mono:    ['JetBrains Mono', 'Menlo', 'monospace'],
       },
     },
   },
