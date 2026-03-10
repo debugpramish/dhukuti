@@ -17,6 +17,10 @@ build/
 */build/
 .vite/
 
+# User uploads (stored in Cloudinary)
+uploads/
+*/uploads/
+
 # Logs
 *.log
 logs/
@@ -36,4 +40,3 @@ Thumbs.db
 
 # Coverage
 coverage/
-

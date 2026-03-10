@@ -6,11 +6,14 @@ export const DEFAULT_SHIPPING_METHODS: ShippingMethod[] = [
 ];
 
 export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
+  const absoluteValue = Math.abs(value);
+  const formattedNumber = new Intl.NumberFormat('en-IN', {
     minimumFractionDigits: 2,
-  }).format(value);
+    maximumFractionDigits: 2,
+  }).format(absoluteValue);
+
+  const signPrefix = value < 0 ? '-Rs ' : 'Rs ';
+  return `${signPrefix}${formattedNumber}`;
 }
 
 export function formatDate(value: string): string {

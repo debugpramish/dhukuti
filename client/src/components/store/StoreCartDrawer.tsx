@@ -4,6 +4,7 @@ import { Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { buildProductPlaceholderImage } from '@/lib/image';
+import { formatCurrency } from '@/features/storefront/utils';
 import { getCartItemCount, useStorefrontCartStore } from '@/stores/storefront-cart-store';
 import { useStorefrontUiStore } from '@/stores/storefront-ui-store';
 
@@ -11,14 +12,6 @@ type StoreCartDrawerProps = {
   slug?: string;
   storeName?: string;
 };
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  }).format(value);
-}
 
 export default function StoreCartDrawer({ storeName = 'Dhukuti Store' }: StoreCartDrawerProps) {
   const isOpen = useStorefrontUiStore((state) => state.isCartDrawerOpen);

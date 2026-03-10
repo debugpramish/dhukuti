@@ -4,27 +4,15 @@ import multer from 'multer';
 import path from 'path';
 import StoreModel, { STORE_COURIER_VALUES, type StoreShippingRules } from '../models/store.model';
 import { requireAuth, requireMerchant } from '../middleware/auth.middleware';
+import { getStoreLogoPublicId, uploadImageBuffer } from '../services/cloudinary.service';
 import { ensureMerchantDemoData, ensureMerchantStore } from '../services/merchant-data.service';
 import { updateStoreSettingsSchema } from '../validation/store.validation';
 
 const storeRouter = express.Router();
 const storeLogoUploadsDirectory = path.resolve(process.cwd(), 'uploads/store-logos');
-fs.mkdirSync(storeLogoUploadsDirectory, { recursive: true });
-
-const storeLogoStorage = multer.diskStorage({
-  destination: (_req, _file, callback) => {
-    callback(null, storeLogoUploadsDirectory);
-  },
-  filename: (_req, file, callback) => {
-    const extension = path.extname(file.originalname) || '.jpg';
-    const safeExtension = extension.replace(/[^a-zA-Z0-9.]/g, '');
-    const generatedName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${safeExtension}`;
-    callback(null, generatedName);
-  },
-});
 
 const storeLogoUpload = multer({
-  storage: storeLogoStorage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 5 * 1024 * 1024,
   },
@@ -37,10 +25,6 @@ const storeLogoUpload = multer({
     callback(new Error('Only image files are allowed'));
   },
 });
-
-function toPublicLogoUrl(_req: express.Request, filename: string): string {
-  return `/uploads/store-logos/${filename}`;
-}
 
 function resolveUploadedLogoPath(logoUrl: string): string | null {
   const uploadSegment = '/uploads/store-logos/';
@@ -198,7 +182,21 @@ storeRouter.put('/settings/logo', requireAuth, requireMerchant, (req, res) => {
       const store = await ensureMerchantStore(req.userId);
       const previousLogoUrl = store.logoUrl || '';
 
-      store.logoUrl = toPublicLogoUrl(req, req.file.filename);
+      if (!req.file.buffer) {
+        return res.status(400).json({ message: 'Invalid logo upload' });
+      }
+
+      try {
+        const uploadResult = await uploadImageBuffer({
+          buffer: req.file.buffer,
+          publicId: getStoreLogoPublicId(store._id.toString()),
+        });
+        store.logoUrl = uploadResult.secureUrl;
+      } catch (error) {
+        console.error('Upload store logo error:', error);
+        return res.status(500).json({ message: 'Unable to upload store logo' });
+      }
+
       await store.save();
 
       if (previousLogoUrl && previousLogoUrl !== store.logoUrl) {

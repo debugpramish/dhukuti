@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { buildProductPlaceholderImage } from '@/lib/image';
 import { cn } from '@/lib/utils';
+import { formatCurrency } from '@/features/storefront/utils';
 import type { StorefrontProduct } from '@/features/storefront/types';
 import type { Product as LegacyProduct } from '@/services/api/types';
 import { useStorefrontCartStore } from '@/stores/storefront-cart-store';
@@ -15,14 +16,6 @@ type ProductCardProps = {
   showFeaturedBadge?: boolean;
   className?: string;
 };
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  }).format(value);
-}
 
 function toCardProduct(product: StorefrontProduct | LegacyProduct): StorefrontProduct {
   if ('slug' in product && 'thumbnail' in product && 'availability' in product) {

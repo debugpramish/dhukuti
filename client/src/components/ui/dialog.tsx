@@ -20,6 +20,9 @@ function Dialog({ open, onOpenChange, title, description, className, children }:
       return undefined;
     }
 
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         onOpenChange(false);
@@ -29,6 +32,7 @@ function Dialog({ open, onOpenChange, title, description, className, children }:
     document.addEventListener('keydown', handleEscKey);
     return () => {
       document.removeEventListener('keydown', handleEscKey);
+      document.body.style.overflow = previousOverflow;
     };
   }, [open, onOpenChange]);
 
@@ -37,40 +41,43 @@ function Dialog({ open, onOpenChange, title, description, className, children }:
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 overflow-y-auto">
       <button
         type="button"
-        className="absolute inset-0 bg-black/50"
+        className="fixed inset-0 bg-black/50"
         onClick={() => onOpenChange(false)}
         aria-label="Close dialog"
       />
 
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className={cn(
-          'relative z-10 w-full max-w-xl rounded-xl border bg-background p-6 shadow-xl',
-          className,
-        )}
-      >
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <div className="space-y-1">
-            <h2 className="text-lg font-semibold text-foreground">{title}</h2>
-            {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
+      <div className="relative z-10 flex min-h-full items-start justify-center p-4 sm:items-center">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
+          className={cn(
+            'relative w-full max-w-xl overflow-y-auto rounded-xl border bg-background p-6 shadow-xl',
+            'max-h-[calc(100vh-2rem)]',
+            className,
+          )}
+        >
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+              {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => onOpenChange(false)}
+              className="h-8 w-8"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => onOpenChange(false)}
-            className="h-8 w-8"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
 
-        {children}
+          {children}
+        </div>
       </div>
     </div>,
     document.body,

@@ -6,6 +6,7 @@ import path from 'path';
 import ProductModel, { type ProductDiscountType } from '../models/product.model';
 import { requireAuth, requireMerchant } from '../middleware/auth.middleware';
 import { ensureMerchantDemoData } from '../services/merchant-data.service';
+import { destroyImageByPublicId, getProductImagePublicId, uploadImageBuffer } from '../services/cloudinary.service';
 import {
   createProductSchema,
   updateProductBestSellerSchema,
@@ -18,22 +19,9 @@ import {
 const productRouter = express.Router();
 
 const uploadsDirectory = path.resolve(process.cwd(), 'uploads/products');
-fs.mkdirSync(uploadsDirectory, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, callback) => {
-    callback(null, uploadsDirectory);
-  },
-  filename: (_req, file, callback) => {
-    const extension = path.extname(file.originalname) || '.jpg';
-    const safeExtension = extension.replace(/[^a-zA-Z0-9.]/g, '');
-    const generatedName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${safeExtension}`;
-    callback(null, generatedName);
-  },
-});
 
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 5 * 1024 * 1024,
   },
@@ -129,10 +117,6 @@ function calculateDiscountedPrice(price: number, discountType: string, discountV
   }
 
   return normalizedPrice;
-}
-
-function toPublicImageUrl(_req: express.Request, filename: string): string {
-  return `/uploads/products/${filename}`;
 }
 
 function escapeSvgText(value: string): string {
@@ -288,46 +272,77 @@ productRouter.post('/', requireAuth, requireMerchant, (req, res) => {
         });
       }
 
-      const imageUrl = req.file
-        ? toPublicImageUrl(req, req.file.filename)
-        : buildPlaceholderImage(parsed.data.title);
+      const productId = new mongoose.Types.ObjectId();
+      const productIdString = productId.toString();
 
-      const product = await ProductModel.create({
-        ownerId: req.userId,
-        title: parsed.data.title,
-        category: parsed.data.category,
-        price: parsed.data.price,
-        discountType: parsed.data.discountType,
-        discountValue: parsed.data.discountValue,
-        status: parsed.data.status,
-        isFeatured: parsed.data.isFeatured,
-        isTrending: parsed.data.isTrending,
-        isBestSeller: parsed.data.isBestSeller,
-        imageUrl,
-        variants: [
-          buildDefaultVariant({
-            stock: parsed.data.stock,
-            lowStockThreshold: parsed.data.lowStockThreshold,
+      let imageUrl = buildPlaceholderImage(parsed.data.title);
+      let uploadedPublicId: string | null = null;
+
+      if (req.file) {
+        if (!req.file.buffer) {
+          return res.status(400).json({ message: 'Invalid image upload' });
+        }
+
+        try {
+          uploadedPublicId = getProductImagePublicId(productIdString);
+          const uploadResult = await uploadImageBuffer({
+            buffer: req.file.buffer,
+            publicId: uploadedPublicId,
+          });
+          imageUrl = uploadResult.secureUrl;
+        } catch (error) {
+          console.error('Upload product image error:', error);
+          return res.status(500).json({ message: 'Unable to upload product image' });
+        }
+      }
+
+      try {
+        const created = await ProductModel.create({
+          _id: productId,
+          ownerId: req.userId,
+          title: parsed.data.title,
+          category: parsed.data.category,
+          price: parsed.data.price,
+          discountType: parsed.data.discountType,
+          discountValue: parsed.data.discountValue,
+          status: parsed.data.status,
+          isFeatured: parsed.data.isFeatured,
+          isTrending: parsed.data.isTrending,
+          isBestSeller: parsed.data.isBestSeller,
+          imageUrl,
+          variants: [
+            buildDefaultVariant({
+              stock: parsed.data.stock,
+              lowStockThreshold: parsed.data.lowStockThreshold,
+            }),
+          ],
+        });
+
+        const product = Array.isArray(created) ? created[0] : created;
+
+        return res.status(201).json({
+          product: toProductResponse({
+            _id: product._id,
+            title: product.title,
+            category: product.category,
+            price: product.price,
+            discountType: product.discountType,
+            discountValue: product.discountValue,
+            imageUrl: product.imageUrl,
+            status: product.status,
+            isFeatured: product.isFeatured,
+            isTrending: product.isTrending,
+            isBestSeller: product.isBestSeller,
+            variants: product.variants,
           }),
-        ],
-      });
+        });
+      } catch (error) {
+        if (uploadedPublicId) {
+          await destroyImageByPublicId(uploadedPublicId);
+        }
 
-      return res.status(201).json({
-        product: toProductResponse({
-          _id: product._id,
-          title: product.title,
-          category: product.category,
-          price: product.price,
-          discountType: product.discountType,
-          discountValue: product.discountValue,
-          imageUrl: product.imageUrl,
-          status: product.status,
-          isFeatured: product.isFeatured,
-          isTrending: product.isTrending,
-          isBestSeller: product.isBestSeller,
-          variants: product.variants,
-        }),
-      });
+        throw error;
+      }
     } catch (error) {
       console.error('Create product error:', error);
       return res.status(500).json({ message: 'Unable to create product' });
@@ -375,7 +390,21 @@ productRouter.put('/:productId', requireAuth, requireMerchant, (req, res) => {
       product.discountValue = parsed.data.discountValue;
 
       if (req.file) {
-        product.imageUrl = toPublicImageUrl(req, req.file.filename);
+        if (!req.file.buffer) {
+          return res.status(400).json({ message: 'Invalid image upload' });
+        }
+
+        try {
+          const uploadResult = await uploadImageBuffer({
+            buffer: req.file.buffer,
+            publicId: getProductImagePublicId(product._id.toString()),
+          });
+
+          product.imageUrl = uploadResult.secureUrl;
+        } catch (error) {
+          console.error('Upload product image error:', error);
+          return res.status(500).json({ message: 'Unable to upload product image' });
+        }
       }
 
       await product.save();
@@ -652,6 +681,7 @@ productRouter.delete('/:productId', requireAuth, requireMerchant, async (req, re
     const imageUrl = product.imageUrl;
     await ProductModel.deleteOne({ _id: productId, ownerId: req.userId });
     await removeUploadedImageIfPresent(imageUrl);
+    await destroyImageByPublicId(getProductImagePublicId(productId));
 
     return res.status(200).json({ message: 'Product deleted successfully' });
   } catch (error) {
