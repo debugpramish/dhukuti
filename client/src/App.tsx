@@ -20,8 +20,8 @@ const AbandonedCartsPage = lazy(() => import('@/pages/dashboard/AbandonedCarts')
 const FinancePage = lazy(() => import('@/pages/dashboard/Finance'));
 const AnalyticsPage = lazy(() => import('@/pages/dashboard/Analytics'));
 
-const MerchantLoginPage = lazy(() => import('@/pages/login'));
-const MerchantSignupPage = lazy(() => import('@/pages/signup'));
+const MerchantLoginPage = lazy(() => import('@/pages/dashboard/auth/LoginPage'));
+const MerchantSignupPage = lazy(() => import('@/pages/dashboard/auth/SignupPage'));
 
 const HomePage = lazy(() => import('@/pages/storefront/HomePage'));
 const ShopPage = lazy(() => import('@/pages/storefront/ShopPage'));

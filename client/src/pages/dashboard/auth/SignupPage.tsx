@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { apiRequest } from '../lib/api';
-import { type AuthUser, getAuthToken, storeAuthSession } from '../lib/auth';
+import { apiRequest } from '@/lib/api';
+import { type AuthUser, getAuthToken, storeAuthSession } from '@/lib/auth';
 
 type AuthResponse = {
   message: string;
