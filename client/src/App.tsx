@@ -19,6 +19,7 @@ const FulfillmentPage = lazy(() => import('@/pages/dashboard/Fulfillment'));
 const AbandonedCartsPage = lazy(() => import('@/pages/dashboard/AbandonedCarts'));
 const FinancePage = lazy(() => import('@/pages/dashboard/Finance'));
 const AnalyticsPage = lazy(() => import('@/pages/dashboard/Analytics'));
+const MarketingLandingPage = lazy(() => import('@/pages/marketing/LandingPage'));
 
 const MerchantLoginPage = lazy(() => import('@/pages/dashboard/auth/LoginPage'));
 const MerchantSignupPage = lazy(() => import('@/pages/dashboard/auth/SignupPage'));
@@ -57,7 +58,7 @@ function FallbackLoader() {
   );
 }
 
-function RootRedirect() {
+function RootEntry() {
   const location = useLocation();
 
   try {
@@ -70,7 +71,7 @@ function RootRedirect() {
     // Ignore malformed search params and fall through to the default redirect.
   }
 
-  return <Navigate to="/dashboard" replace />;
+  return <MarketingLandingPage />;
 }
 
 function LegacyStoreRedirect() {
@@ -124,7 +125,7 @@ export default function App() {
         <AppErrorBoundary>
           <Suspense fallback={<FallbackLoader />}>
             <Routes>
-              <Route index element={<RootRedirect />} />
+              <Route index element={<RootEntry />} />
 
               <Route path="/" element={<StoreLayout />}>
                 <Route path="storefront" element={<HomePage />} />
