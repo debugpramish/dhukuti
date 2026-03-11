@@ -295,7 +295,7 @@ export default function LandingPage() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-500">Founder &amp; CEO</p>
-                    <h4 className="text-lg font-semibold text-slate-900">Raj Patel</h4>
+                    <h4 className="text-lg font-semibold text-slate-900">Rikesh Karmarcharya </h4>
                   </div>
                 </div>
                 <p className="mt-4 text-sm text-slate-600">
@@ -315,9 +315,8 @@ export default function LandingPage() {
               {pricingPlans.map((plan) => (
                 <div
                   key={plan.name}
-                  className={`glass-card hover-raise flex flex-col rounded-2xl p-7 text-left ${
-                    plan.highlight ? 'border-2 border-sky-500 shadow-lg shadow-sky-500/10' : ''
-                  }`}
+                  className={`glass-card hover-raise flex flex-col rounded-2xl p-7 text-left ${plan.highlight ? 'border-2 border-sky-500 shadow-lg shadow-sky-500/10' : ''
+                    }`}
                 >
                   {plan.highlight && (
                     <div className="mb-3 inline-flex w-max items-center rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
@@ -340,11 +339,10 @@ export default function LandingPage() {
 
                   <Link
                     to="/dashboard/register"
-                    className={`mt-8 inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold transition ${
-                      plan.highlight
+                    className={`mt-8 inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold transition ${plan.highlight
                         ? 'bg-sky-500 text-white hover:bg-sky-600'
                         : 'border border-slate-300 text-slate-900 hover:border-slate-400'
-                    }`}
+                      }`}
                   >
                     {plan.name === 'Enterprise' ? 'Contact sales' : 'Get started'}
                   </Link>
