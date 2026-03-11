@@ -22,7 +22,7 @@ export default function DashboardLayout() {
 
   const handleLogout = () => {
     clearAuthSession();
-    navigate('/login', { replace: true });
+    navigate('/dashboard/login', { replace: true });
   };
 
   return (
