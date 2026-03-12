@@ -22,7 +22,11 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+// Allow multiple comma-separated origins so we can support Vercel + localhost without code changes.
+const CLIENT_ORIGINS = (process.env.CLIENT_URLS || process.env.CLIENT_URL || 'http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 const MONGODB_URI = process.env.MONGODB_URI ?? '';
 const MONGODB_URI_DIRECT = process.env.MONGODB_URI_DIRECT ?? '';
 
@@ -43,7 +47,7 @@ app.use(
 );
 app.use(
   cors({
-    origin: CLIENT_URL,
+    origin: CLIENT_ORIGINS.length ? CLIENT_ORIGINS : true,
   }),
 );
 app.use(express.json());
