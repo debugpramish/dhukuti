@@ -1,12 +1,31 @@
 import { type NextFunction, type Request, type Response } from 'express';
-import UserModel, { type UserRole } from '../models/user.model';
-import { verifyAuthToken } from '../utils/auth';
+import UserModel from '../models/user.model';
+import CustomerModel from '../models/customer.model';
+import { verifyAuthToken, type AuthPayload } from '../utils/jwt';
 
 declare global {
   namespace Express {
     interface Request {
-      userId?: string;
+      userId?: string; // kept for backward compatibility
+      authUserId?: string;
+      authRole?: 'merchant' | 'customer';
+      merchantId?: string;
+      customerId?: string;
+      storeId?: string;
     }
+  }
+}
+
+function attachAuthContext(req: Request, payload: AuthPayload) {
+  req.authUserId = payload.sub;
+  req.userId = payload.sub;
+  req.authRole = payload.role;
+
+  if (payload.role === 'merchant') {
+    req.merchantId = payload.sub;
+  } else {
+    req.customerId = payload.sub;
+    req.storeId = payload.storeId ?? req.storeId;
   }
 }
 
@@ -20,50 +39,54 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 
   try {
     const payload = verifyAuthToken(token);
-
-    if (typeof payload === 'string' || !payload.sub) {
-      return res.status(401).json({ message: 'Invalid authorization token' });
-    }
-
-    req.userId = payload.sub;
+    attachAuthContext(req, payload);
     return next();
   } catch (error) {
+    console.error('Auth verification error:', error);
     return res.status(401).json({ message: 'Invalid or expired authorization token' });
   }
 }
 
-function resolveUserRole(role: unknown): UserRole {
-  return role === 'customer' ? 'customer' : 'merchant';
-}
+export async function requireMerchant(req: Request, res: Response, next: NextFunction) {
+  if (req.authRole !== 'merchant' || !req.merchantId) {
+    return res.status(403).json({ message: 'Please login with a merchant account' });
+  }
 
-function buildRoleGuard(requiredRole: UserRole) {
-  return async (req: Request, res: Response, next: NextFunction) => {
-    if (!req.userId) {
-      return res.status(401).json({ message: 'Unauthorized' });
+  try {
+    const merchant = await UserModel.findById(req.merchantId).select({ _id: 1 });
+    if (!merchant) {
+      return res.status(401).json({ message: 'Merchant account not found' });
     }
 
-    try {
-      const user = await UserModel.findById(req.userId).select({ role: 1 });
-      if (!user) {
-        return res.status(401).json({ message: 'Unauthorized' });
-      }
-
-      if (resolveUserRole(user.role) !== requiredRole) {
-        return res.status(403).json({
-          message:
-            requiredRole === 'merchant'
-              ? 'Please login with a merchant account'
-              : 'Please login with a customer account',
-        });
-      }
-
-      return next();
-    } catch (error) {
-      console.error('Role guard error:', error);
-      return res.status(500).json({ message: 'Unable to validate account role' });
-    }
-  };
+    return next();
+  } catch (error) {
+    console.error('Merchant guard error:', error);
+    return res.status(500).json({ message: 'Unable to validate merchant account' });
+  }
 }
 
-export const requireMerchant = buildRoleGuard('merchant');
-export const requireCustomer = buildRoleGuard('customer');
+export async function requireCustomer(req: Request, res: Response, next: NextFunction) {
+  if (req.authRole !== 'customer' || !req.customerId) {
+    return res.status(403).json({ message: 'Please login with a customer account' });
+  }
+
+  try {
+    const customer = await CustomerModel.findById(req.customerId).select({ storeId: 1 });
+    if (!customer) {
+      return res.status(401).json({ message: 'Customer account not found' });
+    }
+
+    const customerStoreId = customer.storeId.toString();
+    if (req.storeId && req.storeId !== customerStoreId) {
+      return res.status(403).json({ message: 'Customer token is not valid for this store' });
+    }
+
+    // Ensure downstream handlers always have storeId.
+    req.storeId = req.storeId ?? customerStoreId;
+
+    return next();
+  } catch (error) {
+    console.error('Customer guard error:', error);
+    return res.status(500).json({ message: 'Unable to validate customer account' });
+  }
+}

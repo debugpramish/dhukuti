@@ -4,10 +4,11 @@ import ProductModel from '../models/product.model';
 import OrderModel from '../models/order.model';
 import InventoryLogModel from '../models/inventory-log.model';
 import StoreAnalyticsEventModel from '../models/store-analytics-event.model';
-import UserModel from '../models/user.model';
+import CustomerModel from '../models/customer.model';
 import CouponModel, { type CouponType } from '../models/coupon.model';
 import StoreContactMessageModel from '../models/store-contact.model';
-import { requireAuth } from '../middleware/auth.middleware';
+import { requireAuth, requireCustomer } from '../middleware/auth.middleware';
+import { resolveStore } from '../middleware/resolveStore.middleware';
 import {
   markAbandonedCheckoutRecovered,
   recordAbandonedCheckout,
@@ -221,10 +222,6 @@ function calculateCouponDiscount(params: {
   }
 
   return roundCurrency(Math.min(params.subtotalAfterProductDiscount, Math.max(discount, 0)));
-}
-
-function resolveUserRole(user: { role?: string }): 'merchant' | 'customer' {
-  return user.role === 'customer' ? 'customer' : 'merchant';
 }
 
 function normalizeTrafficSource(input: unknown): string {
@@ -1378,131 +1375,81 @@ publicStoreRouter.post('/stores/:slug/coupons/validate', async (req, res) => {
   }
 });
 
-publicStoreRouter.post('/stores/:slug/payments/:provider/initiate', requireAuth, async (req, res) => {
-  try {
-    if (!req.userId) {
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
+publicStoreRouter.post(
+  '/stores/:slug/payments/:provider/initiate',
+  resolveStore,
+  requireAuth,
+  requireCustomer,
+  async (req, res) => {
+    try {
+      if (!req.storeId || !req.customerId) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
 
-    const slug = String(req.params.slug || '').trim().toLowerCase();
-    if (!slug) {
-      return res.status(400).json({ message: 'Invalid store slug' });
-    }
+      const slug = req.storeSlug ?? String(req.params.slug || '').trim().toLowerCase();
+      const provider = normalizeDummyPaymentProvider(String(req.params.provider || ''));
+      if (!provider) {
+        return res.status(400).json({ message: 'Unsupported payment provider' });
+      }
 
-    const provider = normalizeDummyPaymentProvider(String(req.params.provider || ''));
-    if (!provider) {
-      return res.status(400).json({ message: 'Unsupported payment provider' });
-    }
-
-    const parsed = createPublicOrderSchema.safeParse({
-      ...req.body,
-      paymentMethod: provider,
-    });
-    if (!parsed.success) {
-      return res.status(400).json({
-        message: 'Invalid payment initiation payload',
-        errors: parsed.error.flatten().fieldErrors,
+      const parsed = createPublicOrderSchema.safeParse({
+        ...req.body,
+        paymentMethod: provider,
       });
-    }
+      if (!parsed.success) {
+        return res.status(400).json({
+          message: 'Invalid payment initiation payload',
+          errors: parsed.error.flatten().fieldErrors,
+        });
+      }
 
-    const store = await StoreModel.findOne({ slug }).select({ _id: 1, ownerId: 1, shippingRules: 1 });
-    if (!store) {
-      return res.status(404).json({ message: 'Store not found' });
-    }
+      const store =
+        req.store ??
+        (await StoreModel.findById(req.storeId).select({ _id: 1, ownerId: 1, shippingRules: 1, slug: 1 }).lean());
+      if (!store) {
+        return res.status(404).json({ message: 'Store not found' });
+      }
 
-    const customer = await UserModel.findById(req.userId).select({ _id: 1, email: 1, role: 1 });
-    if (!customer) {
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
+      const customer = await CustomerModel.findOne({ _id: req.customerId, storeId: req.storeId }).select({
+        _id: 1,
+        email: 1,
+        name: 1,
+      });
+      if (!customer) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
 
-    if (resolveUserRole(customer) !== 'customer') {
-      return res.status(403).json({ message: 'Please login with a customer account to place orders' });
-    }
+      const shippingRules = normalizeShippingRules((store as typeof store)?.shippingRules ?? {});
+      const trackingContext = resolveTrackingContext(req, {
+        trafficSource: parsed.data.trafficSource,
+        sessionId: parsed.data.sessionId,
+      });
+      const quote = await buildCheckoutQuote({
+        ownerId: store.ownerId.toString(),
+        items: parsed.data.items,
+        couponCode: parsed.data.couponCode,
+        paymentMethod: provider,
+        shippingRules,
+      });
 
-    const shippingRules = normalizeShippingRules(store.shippingRules ?? {});
-    const trackingContext = resolveTrackingContext(req, {
-      trafficSource: parsed.data.trafficSource,
-      sessionId: parsed.data.sessionId,
-    });
-    const quote = await buildCheckoutQuote({
-      ownerId: store.ownerId.toString(),
-      items: parsed.data.items,
-      couponCode: parsed.data.couponCode,
-      paymentMethod: provider,
-      shippingRules,
-    });
+      await StoreAnalyticsEventModel.create({
+        ownerId: store.ownerId,
+        storeSlug: slug,
+        eventType: 'checkout_started',
+        sessionId: trackingContext.sessionId || `checkout-${Date.now().toString(36)}`,
+        trafficSource: trackingContext.trafficSource,
+        customerId: customer._id,
+        orderAmount: quote.total,
+      });
 
-    await StoreAnalyticsEventModel.create({
-      ownerId: store.ownerId,
-      storeSlug: slug,
-      eventType: 'checkout_started',
-      sessionId: trackingContext.sessionId || `checkout-${Date.now().toString(36)}`,
-      trafficSource: trackingContext.trafficSource,
-      customerId: customer._id,
-      orderAmount: quote.total,
-    });
-
-    await recordAbandonedCheckout({
-      ownerId: store.ownerId.toString(),
-      storeSlug: slug,
-      customerId: customer._id.toString(),
-      customerName: parsed.data.customerName,
-      customerEmail: customer.email,
-      customerPhone: parsed.data.customerPhone,
-      customerLocation: parsed.data.customerLocation,
-      subtotal: quote.subtotal,
-      productDiscountTotal: quote.productDiscountTotal,
-      couponCode: quote.couponCode,
-      couponDiscountTotal: quote.couponDiscountTotal,
-      discountTotal: quote.discountTotal,
-      shippingFee: quote.shippingFee,
-      codFee: quote.codFee,
-      total: quote.total,
-      paymentMethod: quote.paymentMethod,
-      source: 'payment_initiated',
-      items: quote.items,
-    });
-
-    const paymentSession = createDummyPaymentSession({
-      provider,
-      slug,
-      ownerId: store.ownerId.toString(),
-      customerId: customer._id.toString(),
-      amount: quote.total,
-    });
-
-    const gatewayPayload =
-      provider === 'esewa'
-        ? {
-            merchantCode: 'EPAYTEST',
-            transactionUuid: paymentSession.id,
-            amount: paymentSession.amount,
-            productServiceCharge: 0,
-            productDeliveryCharge: 0,
-            taxAmount: 0,
-            successUrl: `/store/${slug}/catalog?payment=success`,
-            failureUrl: `/store/${slug}/catalog?payment=failed`,
-          }
-        : {
-            publicKey: 'test_public_key_khalti',
-            pidx: paymentSession.id,
-            amountPaisa: Math.round(paymentSession.amount * 100),
-            purchaseOrderName: `Order for ${slug}`,
-            purchaseOrderId: paymentSession.id,
-            returnUrl: `/store/${slug}/catalog?payment=success`,
-            websiteUrl: `/store/${slug}`,
-          };
-
-    return res.status(200).json({
-      payment: {
-        provider,
-        paymentSessionId: paymentSession.id,
-        status: paymentSession.status,
-        amount: paymentSession.amount,
-        expiresAt: new Date(paymentSession.expiresAt).toISOString(),
-        gatewayPayload,
-      },
-      bill: {
+      await recordAbandonedCheckout({
+        ownerId: store.ownerId.toString(),
+        storeSlug: slug,
+        customerId: customer._id.toString(),
+        customerName: parsed.data.customerName,
+        customerEmail: customer.email,
+        customerPhone: parsed.data.customerPhone,
+        customerLocation: parsed.data.customerLocation,
         subtotal: quote.subtotal,
         productDiscountTotal: quote.productDiscountTotal,
         couponCode: quote.couponCode,
@@ -1510,55 +1457,98 @@ publicStoreRouter.post('/stores/:slug/payments/:provider/initiate', requireAuth,
         discountTotal: quote.discountTotal,
         shippingFee: quote.shippingFee,
         codFee: quote.codFee,
-        paymentMethod: quote.paymentMethod,
         total: quote.total,
-      },
-    });
-  } catch (error) {
-    if (error instanceof CheckoutError) {
-      return res.status(error.statusCode).json({ message: error.message });
+        paymentMethod: quote.paymentMethod,
+        source: 'payment_initiated',
+        items: quote.items,
+      });
+
+      const paymentSession = createDummyPaymentSession({
+        provider,
+        slug,
+        ownerId: store.ownerId.toString(),
+        customerId: customer._id.toString(),
+        amount: quote.total,
+      });
+
+      const gatewayPayload =
+        provider === 'esewa'
+          ? {
+              merchantCode: 'EPAYTEST',
+              transactionUuid: paymentSession.id,
+              amount: paymentSession.amount,
+              productServiceCharge: 0,
+              productDeliveryCharge: 0,
+              taxAmount: 0,
+              successUrl: `/store/${slug}/catalog?payment=success`,
+              failureUrl: `/store/${slug}/catalog?payment=failed`,
+            }
+          : {
+              publicKey: 'test_public_key_khalti',
+              pidx: paymentSession.id,
+              amountPaisa: Math.round(paymentSession.amount * 100),
+              purchaseOrderName: `Order for ${slug}`,
+              purchaseOrderId: paymentSession.id,
+              returnUrl: `/store/${slug}/catalog?payment=success`,
+              websiteUrl: `/store/${slug}`,
+            };
+
+      return res.status(200).json({
+        payment: {
+          provider,
+          paymentSessionId: paymentSession.id,
+          status: paymentSession.status,
+          amount: paymentSession.amount,
+          expiresAt: new Date(paymentSession.expiresAt).toISOString(),
+          gatewayPayload,
+        },
+        bill: {
+          subtotal: quote.subtotal,
+          productDiscountTotal: quote.productDiscountTotal,
+          couponCode: quote.couponCode,
+          couponDiscountTotal: quote.couponDiscountTotal,
+          discountTotal: quote.discountTotal,
+          shippingFee: quote.shippingFee,
+          codFee: quote.codFee,
+          paymentMethod: quote.paymentMethod,
+          total: quote.total,
+        },
+      });
+    } catch (error) {
+      if (error instanceof CheckoutError) {
+        return res.status(error.statusCode).json({ message: error.message });
+      }
+
+      console.error('Initiate dummy payment error:', error);
+      return res.status(500).json({ message: 'Unable to initiate payment' });
     }
+  },
+);
 
-    console.error('Initiate dummy payment error:', error);
-    return res.status(500).json({ message: 'Unable to initiate payment' });
-  }
-});
-
-publicStoreRouter.post('/stores/:slug/payments/verify', requireAuth, async (req, res) => {
+publicStoreRouter.post('/stores/:slug/payments/verify', resolveStore, requireAuth, requireCustomer, async (req, res) => {
   try {
-    if (!req.userId) {
+    if (!req.storeId || !req.customerId) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const slug = String(req.params.slug || '').trim().toLowerCase();
-    if (!slug) {
-      return res.status(400).json({ message: 'Invalid store slug' });
-    }
-
+    const slug = req.storeSlug ?? String(req.params.slug || '').trim().toLowerCase();
     const paymentSessionId = parsePaymentSessionId(req.body?.paymentSessionId);
     if (!paymentSessionId) {
       return res.status(400).json({ message: 'Valid paymentSessionId is required' });
     }
 
-    const store = await StoreModel.findOne({ slug }).select({ ownerId: 1 });
+    const store =
+      req.store ??
+      (await StoreModel.findById(req.storeId).select({ ownerId: 1, slug: 1 }).lean());
     if (!store) {
       return res.status(404).json({ message: 'Store not found' });
-    }
-
-    const customer = await UserModel.findById(req.userId).select({ _id: 1, role: 1 });
-    if (!customer) {
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
-
-    if (resolveUserRole(customer) !== 'customer') {
-      return res.status(403).json({ message: 'Please login with a customer account to place orders' });
     }
 
     const paymentSession = verifyDummyPaymentSession({
       paymentSessionId,
       slug,
       ownerId: store.ownerId.toString(),
-      customerId: customer._id.toString(),
+      customerId: req.customerId,
     });
 
     if (!paymentSession) {
@@ -1581,17 +1571,13 @@ publicStoreRouter.post('/stores/:slug/payments/verify', requireAuth, async (req,
   }
 });
 
-publicStoreRouter.post('/stores/:slug/orders/preview', requireAuth, async (req, res) => {
+publicStoreRouter.post('/stores/:slug/orders/preview', resolveStore, requireAuth, requireCustomer, async (req, res) => {
   try {
-    if (!req.userId) {
+    if (!req.storeId || !req.customerId) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const slug = String(req.params.slug || '').trim().toLowerCase();
-    if (!slug) {
-      return res.status(400).json({ message: 'Invalid store slug' });
-    }
-
+    const slug = req.storeSlug ?? String(req.params.slug || '').trim().toLowerCase();
     const parsed = createPublicOrderSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({
@@ -1600,21 +1586,22 @@ publicStoreRouter.post('/stores/:slug/orders/preview', requireAuth, async (req, 
       });
     }
 
-    const store = await StoreModel.findOne({ slug }).select({ _id: 1, ownerId: 1, shippingRules: 1 });
+    const store =
+      req.store ??
+      (await StoreModel.findById(req.storeId).select({ _id: 1, ownerId: 1, shippingRules: 1 }).lean());
     if (!store) {
       return res.status(404).json({ message: 'Store not found' });
     }
 
-    const customer = await UserModel.findById(req.userId).select({ name: 1, email: 1, role: 1 });
+    const customer = await CustomerModel.findOne({ _id: req.customerId, storeId: req.storeId }).select({
+      name: 1,
+      email: 1,
+    });
     if (!customer) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    if (resolveUserRole(customer) !== 'customer') {
-      return res.status(403).json({ message: 'Please login with a customer account to place orders' });
-    }
-
-    const shippingRules = normalizeShippingRules(store.shippingRules ?? {});
+    const shippingRules = normalizeShippingRules((store as typeof store)?.shippingRules ?? {});
     const trackingContext = resolveTrackingContext(req, {
       trafficSource: parsed.data.trafficSource,
       sessionId: parsed.data.sessionId,
@@ -1631,7 +1618,7 @@ publicStoreRouter.post('/stores/:slug/orders/preview', requireAuth, async (req, 
     await recordAbandonedCheckout({
       ownerId: store.ownerId.toString(),
       storeSlug: slug,
-      customerId: req.userId,
+      customerId: req.customerId,
       customerName: parsed.data.customerName,
       customerEmail: customer.email,
       customerPhone: parsed.data.customerPhone,
@@ -1672,17 +1659,13 @@ publicStoreRouter.post('/stores/:slug/orders/preview', requireAuth, async (req, 
   }
 });
 
-publicStoreRouter.post('/stores/:slug/orders', requireAuth, async (req, res) => {
+publicStoreRouter.post('/stores/:slug/orders', resolveStore, requireAuth, requireCustomer, async (req, res) => {
   try {
-    if (!req.userId) {
+    if (!req.storeId || !req.customerId) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const slug = String(req.params.slug || '').trim().toLowerCase();
-    if (!slug) {
-      return res.status(400).json({ message: 'Invalid store slug' });
-    }
-
+    const slug = req.storeSlug ?? String(req.params.slug || '').trim().toLowerCase();
     const parsed = createPublicOrderSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({
@@ -1691,21 +1674,23 @@ publicStoreRouter.post('/stores/:slug/orders', requireAuth, async (req, res) => 
       });
     }
 
-    const store = await StoreModel.findOne({ slug }).select({ _id: 1, ownerId: 1, shippingRules: 1 });
+    const store =
+      req.store ??
+      (await StoreModel.findById(req.storeId).select({ _id: 1, ownerId: 1, shippingRules: 1 }).lean());
     if (!store) {
       return res.status(404).json({ message: 'Store not found' });
     }
 
-    const customer = await UserModel.findById(req.userId).select({ _id: 1, name: 1, email: 1, role: 1 });
+    const customer = await CustomerModel.findOne({ _id: req.customerId, storeId: req.storeId }).select({
+      _id: 1,
+      name: 1,
+      email: 1,
+    });
     if (!customer) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    if (resolveUserRole(customer) !== 'customer') {
-      return res.status(403).json({ message: 'Please login with a customer account to place orders' });
-    }
-
-    const shippingRules = normalizeShippingRules(store.shippingRules ?? {});
+    const shippingRules = normalizeShippingRules((store as typeof store)?.shippingRules ?? {});
     const trackingContext = resolveTrackingContext(req, {
       trafficSource: parsed.data.trafficSource,
       sessionId: parsed.data.sessionId,

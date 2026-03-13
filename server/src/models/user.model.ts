@@ -1,6 +1,7 @@
 import mongoose, { type Document, type Model, type Schema } from 'mongoose';
 
-export const USER_ROLE_VALUES = ['merchant', 'customer'] as const;
+// Users represent merchants/store owners only. Customer accounts live in customer.model.ts
+export const USER_ROLE_VALUES = ['merchant'] as const;
 export type UserRole = (typeof USER_ROLE_VALUES)[number];
 
 export interface UserDocument extends Document {
@@ -9,7 +10,7 @@ export interface UserDocument extends Document {
   phone: string;
   address: string;
   passwordHash: string;
-  role?: UserRole;
+  role: UserRole;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -120,7 +120,7 @@ const orderSchema = new mongoose.Schema<OrderDocument>(
     },
     customerId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: 'Customer',
       index: true,
     },
     orderedByRole: {

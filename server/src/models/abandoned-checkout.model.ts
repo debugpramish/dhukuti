@@ -105,7 +105,7 @@ const abandonedCheckoutSchema = new mongoose.Schema<AbandonedCheckoutDocument>(
     },
     customerId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: 'Customer',
       required: true,
       index: true,
     },

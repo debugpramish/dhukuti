@@ -74,7 +74,7 @@ const storeAnalyticsEventSchema = new mongoose.Schema<StoreAnalyticsEventDocumen
     },
     customerId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: 'Customer',
       index: true,
     },
     orderId: {

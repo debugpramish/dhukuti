@@ -1,16 +1,11 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import OrderModel from '../models/order.model';
-import UserModel from '../models/user.model';
 import { requireAuth, requireCustomer, requireMerchant } from '../middleware/auth.middleware';
 import { ensureMerchantDemoData } from '../services/merchant-data.service';
 import { updateOrderStatusSchema } from '../validation/order.validation';
 
 const orderRouter = express.Router();
-
-function resolveUserRole(role: unknown): 'merchant' | 'customer' {
-  return role === 'customer' ? 'customer' : 'merchant';
-}
 
 function toShipmentResponse(shipment: {
   courier?: string;
@@ -131,11 +126,11 @@ function toOrderResponse(order: {
 
 orderRouter.get('/customer', requireAuth, requireCustomer, async (req, res) => {
   try {
-    if (!req.userId) {
+    if (!req.customerId) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const orders = await OrderModel.find({ customerId: req.userId }).sort({ createdAt: -1 });
+    const orders = await OrderModel.find({ customerId: req.customerId }).sort({ createdAt: -1 });
 
     return res.status(200).json({
       orders: orders.map((order) =>
@@ -181,13 +176,13 @@ orderRouter.get('/customer', requireAuth, requireCustomer, async (req, res) => {
 
 orderRouter.get('/', requireAuth, requireMerchant, async (req, res) => {
   try {
-    if (!req.userId) {
+    if (!req.merchantId) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    await ensureMerchantDemoData(req.userId);
+    await ensureMerchantDemoData(req.merchantId);
 
-    const orders = await OrderModel.find({ ownerId: req.userId }).sort({ createdAt: -1 });
+    const orders = await OrderModel.find({ ownerId: req.merchantId }).sort({ createdAt: -1 });
 
     return res.status(200).json({
       orders: orders.map((order) =>
@@ -233,7 +228,7 @@ orderRouter.get('/', requireAuth, requireMerchant, async (req, res) => {
 
 orderRouter.get('/:orderId', requireAuth, async (req, res) => {
   try {
-    if (!req.userId) {
+    if (!req.authUserId) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
@@ -242,16 +237,10 @@ orderRouter.get('/:orderId', requireAuth, async (req, res) => {
       return res.status(400).json({ message: 'Invalid order id' });
     }
 
-    const user = await UserModel.findById(req.userId).select({ role: 1 });
-    if (!user) {
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
-
-    const role = resolveUserRole(user.role);
-    const query =
-      role === 'customer'
-        ? { _id: rawOrderId, customerId: req.userId }
-        : { _id: rawOrderId, ownerId: req.userId };
+    const isCustomer = req.authRole === 'customer';
+    const query = isCustomer
+      ? { _id: rawOrderId, customerId: req.customerId ?? req.authUserId }
+      : { _id: rawOrderId, ownerId: req.merchantId ?? req.authUserId };
 
     const order = await OrderModel.findOne(query);
     if (!order) {
@@ -300,7 +289,7 @@ orderRouter.get('/:orderId', requireAuth, async (req, res) => {
 
 orderRouter.patch('/:orderId/status', requireAuth, requireMerchant, async (req, res) => {
   try {
-    if (!req.userId) {
+    if (!req.merchantId) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
@@ -322,7 +311,7 @@ orderRouter.patch('/:orderId/status', requireAuth, requireMerchant, async (req, 
       });
     }
 
-    const order = await OrderModel.findOne({ _id: orderId, ownerId: req.userId });
+    const order = await OrderModel.findOne({ _id: orderId, ownerId: req.merchantId });
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
     }
