@@ -840,8 +840,18 @@ export async function fetchStorefrontStore(): Promise<StorefrontStore> {
 }
 
 export async function loginCustomer(payload: LoginInput): Promise<AuthResponse> {
+  const storeSlug = await resolveStoreSlug();
+  if (!storeSlug) {
+    throw new Error('Storefront store is not configured');
+  }
+
   const response = await requestWithFallback<unknown>(
-    ['/api/v1/auth/customer/login', '/auth/customer/login', '/api/v1/auth/login'],
+    [
+      `/api/v1/auth/store/${encodeURIComponent(storeSlug)}/customers/login`,
+      `/auth/store/${encodeURIComponent(storeSlug)}/customers/login`,
+      `/api/v1/auth/stores/${encodeURIComponent(storeSlug)}/customers/login`,
+      `/auth/stores/${encodeURIComponent(storeSlug)}/customers/login`,
+    ],
     {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -852,6 +862,11 @@ export async function loginCustomer(payload: LoginInput): Promise<AuthResponse> 
 }
 
 export async function registerCustomer(payload: RegisterInput): Promise<AuthResponse> {
+  const storeSlug = await resolveStoreSlug();
+  if (!storeSlug) {
+    throw new Error('Storefront store is not configured');
+  }
+
   const signupPayload = {
     name: payload.name,
     email: payload.email,
@@ -862,7 +877,12 @@ export async function registerCustomer(payload: RegisterInput): Promise<AuthResp
   };
 
   const response = await requestWithFallback<unknown>(
-    ['/api/v1/auth/customer/signup', '/auth/customer/signup', '/api/v1/auth/signup'],
+    [
+      `/api/v1/auth/store/${encodeURIComponent(storeSlug)}/customers/register`,
+      `/auth/store/${encodeURIComponent(storeSlug)}/customers/register`,
+      `/api/v1/auth/stores/${encodeURIComponent(storeSlug)}/customers/register`,
+      `/auth/stores/${encodeURIComponent(storeSlug)}/customers/register`,
+    ],
     {
       method: 'POST',
       body: JSON.stringify(signupPayload),

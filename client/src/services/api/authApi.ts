@@ -47,22 +47,63 @@ export type SignupInput = {
   confirmPassword: string;
 };
 
-export async function loginCustomerAccount(payload: LoginInput): Promise<{ token: string; user: AuthUser }> {
-  const response = await httpRequest<AuthResponse>('/auth/customer/login', {
-    method: 'POST',
-    body: payload,
-    skipAuth: true,
-  });
+async function requestCustomerAuth(
+  paths: string[],
+  payload: LoginInput | SignupInput,
+): Promise<{ token: string; user: AuthUser }> {
+  let lastError: unknown;
 
-  return requireAuthPayload(response);
+  for (const path of paths) {
+    try {
+      const response = await httpRequest<AuthResponse>(path, {
+        method: 'POST',
+        body: payload,
+        skipAuth: true,
+      });
+
+      return requireAuthPayload(response);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastError instanceof Error) {
+    throw lastError;
+  }
+
+  throw new Error('Customer authentication failed');
 }
 
-export async function signupCustomerAccount(payload: SignupInput): Promise<{ token: string; user: AuthUser }> {
-  const response = await httpRequest<AuthResponse>('/auth/customer/signup', {
-    method: 'POST',
-    body: payload,
-    skipAuth: true,
-  });
+function buildAuthPaths(storeSlug: string, action: 'login' | 'register'): string[] {
+  const normalized = storeSlug.trim().toLowerCase();
+  if (!normalized) {
+    throw new Error('Store slug is required for customer authentication');
+  }
 
-  return requireAuthPayload(response);
+  return [
+    `/api/v1/auth/store/${encodeURIComponent(normalized)}/customers/${action === 'login' ? 'login' : 'register'}`,
+    `/auth/store/${encodeURIComponent(normalized)}/customers/${action === 'login' ? 'login' : 'register'}`,
+    `/api/v1/auth/stores/${encodeURIComponent(normalized)}/customers/${action === 'login' ? 'login' : 'register'}`,
+    `/auth/stores/${encodeURIComponent(normalized)}/customers/${action === 'login' ? 'login' : 'register'}`,
+  ];
+}
+
+export async function loginCustomerAccount(
+  payload: LoginInput,
+  storeSlug: string,
+): Promise<{ token: string; user: AuthUser }> {
+  const paths = buildAuthPaths(storeSlug, 'login');
+  const response = await requestCustomerAuth(paths, payload);
+
+  return response;
+}
+
+export async function signupCustomerAccount(
+  payload: SignupInput,
+  storeSlug: string,
+): Promise<{ token: string; user: AuthUser }> {
+  const paths = buildAuthPaths(storeSlug, 'register');
+  const response = await requestCustomerAuth(paths, payload);
+
+  return response;
 }

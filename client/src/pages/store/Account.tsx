@@ -58,7 +58,7 @@ export default function PublicStoreAccountPage() {
     setIsSubmitting(true);
 
     try {
-      const authPayload = await loginCustomerAccount({ email, password });
+      const authPayload = await loginCustomerAccount({ email, password }, slug);
       storeCustomerAuthSession(authPayload.token, authPayload.user, rememberMe);
       setCustomerUser(authPayload.user);
       setIsAuthenticated(true);
@@ -86,14 +86,17 @@ export default function PublicStoreAccountPage() {
     setIsSubmitting(true);
 
     try {
-      const authPayload = await signupCustomerAccount({
-        name,
-        email,
-        phone,
-        address,
-        password,
-        confirmPassword,
-      });
+      const authPayload = await signupCustomerAccount(
+        {
+          name,
+          email,
+          phone,
+          address,
+          password,
+          confirmPassword,
+        },
+        slug,
+      );
       storeCustomerAuthSession(authPayload.token, authPayload.user, rememberMe);
       setCustomerUser(authPayload.user);
       setIsAuthenticated(true);
