@@ -115,6 +115,15 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
+// ── Compatibility shim: redirect old /api/* paths to /api/v1/* ──
+app.use((req, _res, next) => {
+  // If client still calls unversioned endpoints (e.g., /api/orders), rewrite to /api/v1/orders
+  if (req.url.startsWith('/api/') && !req.url.startsWith('/api/v1/')) {
+    req.url = `/api/v1${req.url.slice('/api'.length)}`;
+  }
+  next();
+});
+
 // ── Health check ────────────────────────────
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', product: 'Dhukuti API' });

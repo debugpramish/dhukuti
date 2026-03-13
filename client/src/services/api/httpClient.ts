@@ -83,12 +83,18 @@ function resolvePath(path: string): string {
 
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
 
+  // Auto-upgrade legacy /api/* paths to the versioned /api/v1/* prefix.
+  const versionedPath =
+    normalizedPath.startsWith('/api/v1/') || !normalizedPath.startsWith('/api/')
+      ? normalizedPath
+      : `/api/v1${normalizedPath.slice('/api'.length)}`;
+
   // If VITE_API_URL already ends with /api/v1, don't duplicate the prefix.
-  if (API_BASE_URL.endsWith(API_V1_PREFIX) && normalizedPath.startsWith(`${API_V1_PREFIX}/`)) {
-    return `${API_BASE_URL}${normalizedPath.slice(API_V1_PREFIX.length)}`;
+  if (API_BASE_URL.endsWith(API_V1_PREFIX) && versionedPath.startsWith(`${API_V1_PREFIX}/`)) {
+    return `${API_BASE_URL}${versionedPath.slice(API_V1_PREFIX.length)}`;
   }
 
-  return `${API_BASE_URL}${normalizedPath}`;
+  return `${API_BASE_URL}${versionedPath}`;
 }
 
 async function parseResponsePayload(response: Response): Promise<unknown> {
