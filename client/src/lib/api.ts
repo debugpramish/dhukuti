@@ -1,9 +1,16 @@
 const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 export const API_BASE_URL = rawApiUrl.replace(/\/+$/, '');
+const API_V1_PREFIX = '/api/v1';
 const API_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 15000);
 
 function buildUrl(path: string): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+
+  // If the deployment URL already ends with /api/v1, avoid duplicating the prefix.
+  if (API_BASE_URL.endsWith(API_V1_PREFIX) && normalizedPath.startsWith(`${API_V1_PREFIX}/`)) {
+    return `${API_BASE_URL}${normalizedPath.slice(API_V1_PREFIX.length)}`;
+  }
+
   return `${API_BASE_URL}${normalizedPath}`;
 }
 

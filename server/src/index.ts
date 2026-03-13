@@ -1,6 +1,6 @@
 import express from 'express';
 import mongoose from 'mongoose';
-import cors from 'cors';
+import cors, { type CorsOptions } from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import authRouter from './routes/auth.routes';
@@ -39,17 +39,78 @@ mongoose.set('bufferCommands', false);
 mongoose.set('bufferTimeoutMS', 5000);
 
 // ── Middleware ──────────────────────────────
+
+const allowAllCors = String(process.env.CORS_ALLOW_ALL || '').toLowerCase() === 'true';
+
+const dynamicCorsOptions: CorsOptions = {
+  origin(origin, callback) {
+    // Short-circuit: explicitly allow everything (useful for staging/debug).
+    if (allowAllCors) {
+      return callback(null, true);
+    }
+
+    // Allow same-origin/non-browser requests (e.g., curl, server-to-server).
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    const allowList = [
+      ...CLIENT_ORIGINS,
+      /\.onrender\.com$/,
+      /\.vercel\.app$/,
+      /localhost:\d{4}$/,
+      /127\.0\.0\.1:\d{4}$/,
+    ];
+
+    const isAllowed = allowList.some((allowed) =>
+      typeof allowed === 'string' ? allowed === origin : allowed.test(origin),
+    );
+
+    if (isAllowed) {
+      return callback(null, true);
+    }
+
+    console.warn(`CORS blocked origin: ${origin}`);
+    return callback(new Error(`CORS: origin not allowed -> ${origin}`));
+  },
+  credentials: true,
+  // Avoid 204 with empty headers; 200 makes debugging simpler.
+  optionsSuccessStatus: 200,
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
+};
+
+console.log('CORS allowlist:', CLIENT_ORIGINS);
+
 app.use(
   helmet({
     // Allow frontend origin (e.g. localhost:5173) to render uploaded images from this API origin.
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   }),
 );
-app.use(
-  cors({
-    origin: CLIENT_ORIGINS.length ? CLIENT_ORIGINS : true,
-  }),
-);
+// Apply CORS globally; keep credentials and reflected origin
+app.use(cors(dynamicCorsOptions));
+// Preflight handler (regex avoids path-to-regexp '*' issue in Express 5)
+app.options(/.*/, cors(dynamicCorsOptions));
+
+// Fallback CORS headers (defensive): ensure Access-Control-Allow-Origin is always present
+app.use((req, res, next) => {
+  const origin = req.headers.origin as string | undefined;
+  res.header('Access-Control-Allow-Origin', origin ?? '*');
+  res.header('Vary', 'Origin');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header(
+    'Access-Control-Allow-Headers',
+    req.headers['access-control-request-headers'] ?? 'Content-Type, Authorization, Accept, X-Requested-With',
+  );
+  res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+
+  return next();
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));

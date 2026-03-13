@@ -1,6 +1,7 @@
 import { getAuthToken } from '@/lib/auth';
 
 const rawApiUrl = import.meta.env.VITE_API_URL;
+const API_V1_PREFIX = '/api/v1';
 
 export const API_BASE_URL =
   typeof rawApiUrl === 'string' && rawApiUrl.trim().length > 0
@@ -81,6 +82,12 @@ function resolvePath(path: string): string {
   }
 
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+
+  // If VITE_API_URL already ends with /api/v1, don't duplicate the prefix.
+  if (API_BASE_URL.endsWith(API_V1_PREFIX) && normalizedPath.startsWith(`${API_V1_PREFIX}/`)) {
+    return `${API_BASE_URL}${normalizedPath.slice(API_V1_PREFIX.length)}`;
+  }
+
   return `${API_BASE_URL}${normalizedPath}`;
 }
 
