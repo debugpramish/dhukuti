@@ -1,5 +1,11 @@
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+export const API_BASE_URL = rawApiUrl.replace(/\/+$/, '');
 const API_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 15000);
+
+function buildUrl(path: string): string {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${API_BASE_URL}${normalizedPath}`;
+}
 
 export async function apiRequest<TResponse>(
   path: string,
@@ -15,7 +21,7 @@ export async function apiRequest<TResponse>(
   let response: Response;
 
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+    response = await fetch(buildUrl(path), {
       ...init,
       signal,
       headers: {

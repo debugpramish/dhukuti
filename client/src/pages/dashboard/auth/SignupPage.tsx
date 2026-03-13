@@ -40,7 +40,7 @@ export default function SignupPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await apiRequest<AuthResponse>('/auth/signup', {
+      const response = await apiRequest<AuthResponse>('/api/v1/auth/signup', {
         method: 'POST',
         body: JSON.stringify({
           name,

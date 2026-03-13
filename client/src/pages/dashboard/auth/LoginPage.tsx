@@ -49,7 +49,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await apiRequest<AuthResponse>('/auth/login', {
+      const response = await apiRequest<AuthResponse>('/api/v1/auth/login', {
         method: 'POST',
         body: JSON.stringify({
           email,
