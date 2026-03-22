@@ -20,7 +20,7 @@ import type {
 } from '@/features/storefront/types';
 import { useSeo } from '@/hooks/use-seo';
 import { useStorefrontAuthStore } from '@/stores/storefront-auth-store';
-import { getCartItemCount, useStorefrontCartStore } from '@/stores/storefront-cart-store';
+import { getCartItemCount, resetStorefrontCart, useStorefrontCartStore } from '@/stores/storefront-cart-store';
 import { useStorefrontUiStore } from '@/stores/storefront-ui-store';
 
 const PAYMENT_METHODS: Array<{ value: PaymentMethod; label: string }> = [
@@ -34,12 +34,12 @@ const checkoutSteps = ['Shipping Address', 'Shipping Method', 'Payment Method', 
 function isAddressComplete(address: ShippingAddress): boolean {
   return Boolean(
     address.name.trim() &&
-      address.email.trim() &&
-      address.phone.trim() &&
-      address.address.trim() &&
-      address.city.trim() &&
-      address.postalCode.trim() &&
-      address.country.trim(),
+    address.email.trim() &&
+    address.phone.trim() &&
+    address.address.trim() &&
+    address.city.trim() &&
+    address.postalCode.trim() &&
+    address.country.trim(),
   );
 }
 
@@ -51,8 +51,9 @@ export default function CheckoutPage() {
 
   const navigate = useNavigate();
   const pushToast = useStorefrontUiStore((state) => state.pushToast);
+  const closeCartDrawer = useStorefrontUiStore((state) => state.closeCartDrawer);
 
-  const { items, cartTotal, clearCart } = useStorefrontCartStore();
+  const { items, cartTotal } = useStorefrontCartStore();
   const itemCount = getCartItemCount(items);
   const { isAuthenticated, token, user } = useStorefrontAuthStore();
 
@@ -277,7 +278,8 @@ export default function CheckoutPage() {
 
     try {
       const result = await createOrder(buildCheckoutPayload(), token);
-      clearCart();
+      resetStorefrontCart();
+      closeCartDrawer();
       pushToast({
         variant: 'success',
         title: 'Order placed successfully',

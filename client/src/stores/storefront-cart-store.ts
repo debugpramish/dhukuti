@@ -4,6 +4,8 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import type { CartItem, StorefrontProduct } from '@/features/storefront/types';
 
 const MAX_ITEM_QUANTITY = 20;
+const STOREFRONT_CART_STORAGE_KEY = 'dhukuti-storefront-cart';
+const LEGACY_STORE_CART_STORAGE_PREFIX = 'dhukuti:store-cart:';
 
 function calculateCartTotal(items: CartItem[]): number {
   return Number(items.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2));
@@ -129,7 +131,7 @@ export const useStorefrontCartStore = create<StorefrontCartState>()(
       }),
     }),
     {
-      name: 'dhukuti-storefront-cart',
+      name: STOREFRONT_CART_STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         items: state.items,
@@ -141,4 +143,23 @@ export const useStorefrontCartStore = create<StorefrontCartState>()(
 
 export function getCartItemCount(items: CartItem[]): number {
   return items.reduce((sum, item) => sum + item.quantity, 0);
+}
+
+export function resetStorefrontCart(): void {
+  useStorefrontCartStore.setState({ items: [], cartTotal: 0 });
+
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(STOREFRONT_CART_STORAGE_KEY);
+
+    // Remove stale cart snapshots from the legacy per-store cart context.
+    Object.keys(window.localStorage)
+      .filter((key) => key.startsWith(LEGACY_STORE_CART_STORAGE_PREFIX))
+      .forEach((key) => window.localStorage.removeItem(key));
+  } catch {
+    // Ignore storage failures; in-memory state has already been reset.
+  }
 }
