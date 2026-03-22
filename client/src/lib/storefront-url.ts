@@ -49,8 +49,21 @@ function shouldUseQueryStoreParam(locationLike: Location): boolean {
     if (ENV_STOREFRONT_URL_MODE === 'subdomain') {
         return false;
     }
-    void locationLike;
-    // Auto mode defaults to subdomain-first; query mode is opt-in via env.
+
+    const normalizedHost = locationLike.hostname.trim().toLowerCase();
+    const rootDomain = resolveRootDomain(normalizedHost);
+
+    // Vercel default project domains do not include wildcard cert coverage for
+    // arbitrary merchant subdomains (e.g. <slug>.<project>.vercel.app).
+    // In auto mode, keep the working query URL unless a wildcard-capable
+    // custom root domain is configured.
+    if (
+        normalizedHost.endsWith('.vercel.app')
+        && (!rootDomain || rootDomain.endsWith('.vercel.app'))
+    ) {
+        return true;
+    }
+
     return false;
 }
 
