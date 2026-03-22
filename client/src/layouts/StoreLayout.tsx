@@ -1,15 +1,18 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link, Outlet } from 'react-router-dom';
+import { Link, useOutlet } from 'react-router-dom';
 
 import StoreCartDrawer from '@/components/store/StoreCartDrawer';
 import StoreFooter from '@/components/store/StoreFooter';
 import StoreNavbar from '@/components/store/StoreNavbar';
 import StoreToaster from '@/components/common/StoreToaster';
 import { fetchStorefrontStore } from '@/features/storefront/api/storefrontApi';
+import HomePage from '@/pages/storefront/HomePage';
 
 const storefrontName = import.meta.env.VITE_STOREFRONT_NAME || 'Dhukuti Store';
 
 export default function StoreLayout() {
+  const outlet = useOutlet();
+
   const {
     data: store,
     isLoading,
@@ -54,7 +57,7 @@ export default function StoreLayout() {
       <div className="storefront-orb storefront-orb-three" aria-hidden />
       <StoreNavbar storeName={resolvedStoreName} logoUrl={store.logoUrl} />
       <main className="storefront-main sm:px-6 lg:px-8">
-        <Outlet />
+        {outlet ?? <HomePage />}
       </main>
       <StoreFooter
         storeName={resolvedStoreName}

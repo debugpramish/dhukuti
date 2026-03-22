@@ -7,6 +7,7 @@ import DashboardLayout from '@/layouts/DashboardLayout';
 import StoreLayout from '@/layouts/StoreLayout';
 import { getAuthToken } from '@/lib/auth';
 import { getStoreSlugFromLocation } from '@/lib/storefront-url';
+import HomePage from '@/pages/storefront/HomePage';
 
 const OverviewPage = lazy(() => import('@/pages/dashboard/Overview'));
 const OrdersPage = lazy(() => import('@/pages/dashboard/Orders'));
@@ -25,7 +26,6 @@ const MarketingLandingPage = lazy(() => import('@/pages/marketing/LandingPage'))
 const MerchantLoginPage = lazy(() => import('@/pages/dashboard/auth/LoginPage'));
 const MerchantSignupPage = lazy(() => import('@/pages/dashboard/auth/SignupPage'));
 
-const HomePage = lazy(() => import('@/pages/storefront/HomePage'));
 const ShopPage = lazy(() => import('@/pages/storefront/ShopPage'));
 const ProductPage = lazy(() => import('@/pages/storefront/ProductPage'));
 const CartPage = lazy(() => import('@/pages/storefront/CartPage'));
@@ -60,11 +60,9 @@ function FallbackLoader() {
 }
 
 function RootEntry() {
-  const location = useLocation();
-
   const storeSlug = getStoreSlugFromLocation();
   if (storeSlug) {
-    return <Navigate to={`/storefront${location.search || ''}`} replace />;
+    return <StoreLayout />;
   }
 
   return <MarketingLandingPage />;
