@@ -1,6 +1,9 @@
 const ENV_STOREFRONT_ROOT_DOMAIN = String(import.meta.env.VITE_STOREFRONT_ROOT_DOMAIN || '')
     .trim()
     .toLowerCase();
+const ENV_STOREFRONT_URL_MODE = String(import.meta.env.VITE_STOREFRONT_URL_MODE || 'auto')
+    .trim()
+    .toLowerCase();
 
 const STORE_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 
@@ -36,6 +39,26 @@ function resolveRootDomain(hostname: string): string {
     }
 
     return normalizedHost;
+}
+
+function shouldUseQueryStoreParam(locationLike: Location): boolean {
+    if (ENV_STOREFRONT_URL_MODE === 'query') {
+        return true;
+    }
+
+    if (ENV_STOREFRONT_URL_MODE === 'subdomain') {
+        return false;
+    }
+
+    const normalizedHost = locationLike.hostname.trim().toLowerCase();
+
+    // Vercel default domains do not provide arbitrary wildcard certs for
+    // `<slug>.<project>.vercel.app`, so use query mode by default there.
+    if (normalizedHost.endsWith('.vercel.app') && !ENV_STOREFRONT_ROOT_DOMAIN) {
+        return true;
+    }
+
+    return false;
 }
 
 export function getStorefrontRootDomain(hostname: string): string {
@@ -101,6 +124,11 @@ export function buildStorefrontOrigin(slug: string, locationLike: Location = win
         return '';
     }
 
+    if (shouldUseQueryStoreParam(locationLike)) {
+        const portSuffix = locationLike.port ? `:${locationLike.port}` : '';
+        return `${locationLike.protocol}//${locationLike.hostname}${portSuffix}`;
+    }
+
     const rootDomain = resolveRootDomain(locationLike.hostname);
     if (!rootDomain) {
         return '';
@@ -112,11 +140,22 @@ export function buildStorefrontOrigin(slug: string, locationLike: Location = win
 }
 
 export function buildStorefrontUrl(slug: string, pathname = '/storefront', locationLike: Location = window.location): string {
-    const origin = buildStorefrontOrigin(slug, locationLike);
+    const normalizedSlug = normalizeSlug(slug);
+    if (!isValidStoreSlug(normalizedSlug)) {
+        return '';
+    }
+
+    const origin = buildStorefrontOrigin(normalizedSlug, locationLike);
     if (!origin) {
         return '';
     }
 
     const normalizedPath = pathname.startsWith('/') ? pathname : `/${pathname}`;
+    if (shouldUseQueryStoreParam(locationLike)) {
+        const url = new URL(normalizedPath, origin);
+        url.searchParams.set('store', normalizedSlug);
+        return url.toString();
+    }
+
     return `${origin}${normalizedPath}`;
 }
