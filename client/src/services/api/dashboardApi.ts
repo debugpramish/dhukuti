@@ -115,8 +115,12 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   return normalizeSummary(unwrapData<DashboardSummaryPayload>(response));
 }
 
-export async function getDashboardOrderTrends(): Promise<DashboardOrderTrends> {
-  const response = await httpRequest<DashboardOrderTrendsResponse>('/api/dashboard/order-trends', {
+export async function getDashboardOrderTrends(productId?: string): Promise<DashboardOrderTrends> {
+  const query = typeof productId === 'string' && productId.trim().length > 0
+    ? `?productId=${encodeURIComponent(productId.trim())}`
+    : '';
+
+  const response = await httpRequest<DashboardOrderTrendsResponse>(`/api/dashboard/order-trends${query}`, {
     method: 'GET',
   });
 

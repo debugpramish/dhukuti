@@ -161,6 +161,7 @@ async function buildTrendBucket(params: {
   ownerId: mongoose.Types.ObjectId;
   periods: PeriodDefinition[];
   dateFormat: '%Y-%m-%d' | '%Y-%m' | '%Y';
+  orderMatch?: Record<string, unknown>;
 }): Promise<DashboardTrendBucket> {
   if (params.periods.length === 0) {
     return {
@@ -195,6 +196,7 @@ async function buildTrendBucket(params: {
           $gte: firstPeriodStart,
           $lt: lastPeriodEnd,
         },
+        ...(params.orderMatch ?? {}),
       },
     },
     {
@@ -317,6 +319,58 @@ dashboardRouter.get('/order-trends', requireAuth, requireMerchant, async (req, r
     await ensureMerchantDemoData(req.userId);
 
     const ownerObjectId = new mongoose.Types.ObjectId(req.userId);
+    const requestedProductId =
+      typeof req.query.productId === 'string' && req.query.productId.trim().length > 0
+        ? req.query.productId.trim()
+        : null;
+
+    let orderMatch: Record<string, unknown> | undefined;
+
+    if (requestedProductId) {
+      if (!mongoose.Types.ObjectId.isValid(requestedProductId)) {
+        return res.status(400).json({ message: 'Invalid product id' });
+      }
+
+      const product = await ProductModel.findOne({
+        _id: requestedProductId,
+        ownerId: ownerObjectId,
+      }).select({ title: 1, variants: 1 });
+
+      if (!product) {
+        return res.status(404).json({ message: 'Product not found' });
+      }
+
+      const skuList = Array.isArray(product.variants)
+        ? product.variants
+          .map((variant) => (typeof variant.sku === 'string' ? variant.sku.trim() : ''))
+          .filter((sku): sku is string => sku.length > 0)
+        : [];
+
+      const normalizedTitle = typeof product.title === 'string' ? product.title.trim() : '';
+      const itemFilters: Array<Record<string, unknown>> = [];
+
+      if (skuList.length > 0) {
+        itemFilters.push({ sku: { $in: skuList } });
+      }
+
+      if (normalizedTitle.length > 0) {
+        itemFilters.push({ title: normalizedTitle });
+      }
+
+      if (itemFilters.length > 0) {
+        orderMatch = {
+          items: {
+            $elemMatch:
+              itemFilters.length === 1
+                ? itemFilters[0]
+                : {
+                  $or: itemFilters,
+                },
+          },
+        };
+      }
+    }
+
     const now = new Date();
     const dayPeriods = createDayPeriodDefinitions(now);
     const monthPeriods = createMonthPeriodDefinitions(now);
@@ -327,16 +381,19 @@ dashboardRouter.get('/order-trends', requireAuth, requireMerchant, async (req, r
         ownerId: ownerObjectId,
         periods: dayPeriods,
         dateFormat: '%Y-%m-%d',
+        orderMatch,
       }),
       buildTrendBucket({
         ownerId: ownerObjectId,
         periods: monthPeriods,
         dateFormat: '%Y-%m',
+        orderMatch,
       }),
       buildTrendBucket({
         ownerId: ownerObjectId,
         periods: yearPeriods,
         dateFormat: '%Y',
+        orderMatch,
       }),
     ]);
 

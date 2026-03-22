@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 import type { DashboardOrderTrendBucket, DashboardOrderTrends } from '@/services/api/types';
 import { cn } from '@/lib/utils';
@@ -61,7 +61,7 @@ function TrendDelta({
 }
 
 export default function OrderTrendsChart({ trends }: { trends: DashboardOrderTrends }) {
-  const [activePeriod, setActivePeriod] = useState<TrendPeriod>('day');
+  const [activePeriod, setActivePeriod] = useState<TrendPeriod>('month');
 
   const activeBucket = useMemo(() => {
     if (activePeriod === 'day') {
@@ -78,7 +78,36 @@ export default function OrderTrendsChart({ trends }: { trends: DashboardOrderTre
   const sortedPeriods: TrendPeriod[] = ['day', 'month', 'year'];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" style={{ fontFamily: '"DM Sans", ui-sans-serif, system-ui, sans-serif' }}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Order trend</p>
+          <p className="mt-1 text-sm text-slate-500">Compare performance by day, month, or year</p>
+        </div>
+
+        <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
+          {sortedPeriods.map((period) => {
+            const isActive = period === activePeriod;
+
+            return (
+              <button
+                key={period}
+                type="button"
+                onClick={() => setActivePeriod(period)}
+                className={cn(
+                  'rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
+                  isActive
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-500 hover:bg-white/70 hover:text-slate-800',
+                )}
+              >
+                {trendPeriodLabels[period]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-3">
         {sortedPeriods.map((period) => {
           const bucket = trends[period];
@@ -90,15 +119,17 @@ export default function OrderTrendsChart({ trends }: { trends: DashboardOrderTre
               type="button"
               onClick={() => setActivePeriod(period)}
               className={cn(
-                'rounded-lg border p-4 text-left transition-colors',
-                isActive ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/30',
+                'rounded-xl border p-4 text-left transition-all',
+                isActive
+                  ? 'border-indigo-200 bg-gradient-to-br from-indigo-50 to-indigo-100/50'
+                  : 'border-slate-200 bg-white hover:border-slate-300',
               )}
             >
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                 {trendPeriodLabels[period]}
               </p>
-              <p className="mt-1 text-2xl font-semibold text-foreground">{bucket.current}</p>
-              <p className="text-xs text-muted-foreground">Current orders</p>
+              <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900">{bucket.current}</p>
+              <p className="text-xs text-slate-500">Orders in this period</p>
               <div className="mt-2">
                 <TrendDelta bucket={bucket} period={period} />
               </div>
@@ -107,25 +138,45 @@ export default function OrderTrendsChart({ trends }: { trends: DashboardOrderTre
         })}
       </div>
 
-      <div className="h-[300px] w-full">
+      <div className="h-[280px] w-full overflow-hidden rounded-xl border border-indigo-100 bg-gradient-to-b from-indigo-50/60 to-white p-2">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={activeBucket.series} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
-            <CartesianGrid vertical={false} strokeDasharray="3 3" />
+          <AreaChart data={activeBucket.series} margin={{ top: 12, right: 8, left: -16, bottom: 0 }}>
+            <defs>
+              <linearGradient id="ordersAreaFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#6366f1" stopOpacity={0.25} />
+                <stop offset="100%" stopColor="#6366f1" stopOpacity={0.03} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e2e8f0" />
             <XAxis
               dataKey="label"
               tickLine={false}
               axisLine={false}
               minTickGap={18}
-              tick={{ fontSize: 12 }}
+              tick={{ fontSize: 12, fill: '#94a3b8' }}
             />
-            <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
+            <YAxis
+              allowDecimals={false}
+              tickLine={false}
+              axisLine={false}
+              tick={{ fontSize: 12, fill: '#94a3b8' }}
+            />
             <Tooltip
-              cursor={{ fill: 'hsl(var(--muted))' }}
+              cursor={{ stroke: '#a5b4fc', strokeDasharray: '4 4' }}
+              contentStyle={{ borderRadius: '10px', borderColor: '#cbd5e1' }}
               formatter={(value) => [`${Number(value ?? 0)} orders`, 'Orders']}
               labelFormatter={(label) => `${trendPeriodLabels[activePeriod]}: ${label}`}
             />
-            <Bar dataKey="count" fill="hsl(var(--chart-1))" radius={[6, 6, 0, 0]} />
-          </BarChart>
+            <Area
+              type="monotone"
+              dataKey="count"
+              stroke="#6366f1"
+              strokeWidth={2.5}
+              fill="url(#ordersAreaFill)"
+              dot={{ r: 3, fill: '#ffffff', stroke: '#6366f1', strokeWidth: 2 }}
+              activeDot={{ r: 4, fill: '#6366f1' }}
+            />
+          </AreaChart>
         </ResponsiveContainer>
       </div>
     </div>
