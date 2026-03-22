@@ -6,6 +6,7 @@ import AppErrorBoundary from '@/components/common/AppErrorBoundary';
 import DashboardLayout from '@/layouts/DashboardLayout';
 import StoreLayout from '@/layouts/StoreLayout';
 import { getAuthToken } from '@/lib/auth';
+import { getStoreSlugFromLocation } from '@/lib/storefront-url';
 
 const OverviewPage = lazy(() => import('@/pages/dashboard/Overview'));
 const OrdersPage = lazy(() => import('@/pages/dashboard/Orders'));
@@ -61,14 +62,9 @@ function FallbackLoader() {
 function RootEntry() {
   const location = useLocation();
 
-  try {
-    const params = new URLSearchParams(location.search);
-    const storeSlug = params.get('store');
-    if (storeSlug) {
-      return <Navigate to={`/storefront${location.search || ''}`} replace />;
-    }
-  } catch {
-    // Ignore malformed search params and fall through to the default redirect.
+  const storeSlug = getStoreSlugFromLocation();
+  if (storeSlug) {
+    return <Navigate to={`/storefront${location.search || ''}`} replace />;
   }
 
   return <MarketingLandingPage />;

@@ -42,7 +42,16 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     attachAuthContext(req, payload);
     return next();
   } catch (error) {
-    console.error('Auth verification error:', error);
+    const message = error instanceof Error ? error.message : String(error || 'Unknown auth error');
+
+    // Invalid/expired JWTs are expected when switching environments or after logout.
+    // Keep logs concise instead of printing full stack traces on every request.
+    if (/invalid signature|jwt malformed|jwt expired|invalid token/i.test(message)) {
+      console.warn(`Auth verification rejected token: ${message}`);
+    } else {
+      console.error('Auth verification error:', error);
+    }
+
     return res.status(401).json({ message: 'Invalid or expired authorization token' });
   }
 }

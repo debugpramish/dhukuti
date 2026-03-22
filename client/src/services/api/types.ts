@@ -429,6 +429,9 @@ export type ShippingRules = {
 
 export type StoreSettings = {
   slug: string;
+  slugChangeCount: number;
+  paidSlugChangeCredits: number;
+  requiresSlugChangePayment: boolean;
   name: string;
   description: string;
   phone: string;
@@ -437,9 +440,9 @@ export type StoreSettings = {
   shippingRules: ShippingRules;
 };
 
-export type StoreSettingsUpdateInput = Pick<StoreSettings, 'name' | 'description' | 'phone' | 'address'>;
+export type StoreSettingsUpdateInput = Pick<StoreSettings, 'slug' | 'name' | 'description' | 'phone' | 'address'>;
 
-export type PublicStore = StoreSettings;
+export type PublicStore = Omit<StoreSettings, 'slugChangeCount' | 'paidSlugChangeCredits' | 'requiresSlugChangePayment'>;
 
 export type StoreContactInput = {
   name: string;

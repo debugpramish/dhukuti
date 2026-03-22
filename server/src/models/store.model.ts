@@ -15,6 +15,8 @@ export interface StoreShippingRules {
 export interface StoreDocument extends Document {
   ownerId: Types.ObjectId;
   slug: string;
+  slugChangeCount: number;
+  paidSlugChangeCredits: number;
   name: string;
   description: string;
   phone: string;
@@ -43,6 +45,16 @@ const storeSchema = new mongoose.Schema<StoreDocument>(
       lowercase: true,
       minlength: 2,
       maxlength: 120,
+    },
+    slugChangeCount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    paidSlugChangeCredits: {
+      type: Number,
+      min: 0,
+      default: 0,
     },
     name: {
       type: String,

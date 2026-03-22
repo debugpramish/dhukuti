@@ -1,6 +1,8 @@
 import type { ProductQueryInput } from '@/features/storefront/types';
 
 export const storefrontQueryKeys = {
+  // Cache keys don't include slug since it's resolved async by each API function.
+  // Cache isolation happens at the API level (resolveStore clears cache on slug change).
   featuredProducts: ['storefront', 'products', 'featured'] as const,
   trendingProducts: ['storefront', 'products', 'trending'] as const,
   bestSellerProducts: ['storefront', 'products', 'best-seller'] as const,

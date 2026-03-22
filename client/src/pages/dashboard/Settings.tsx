@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Upload } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -10,9 +10,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { buildStorefrontUrl, getStorefrontRootDomain } from '@/lib/storefront-url';
 import { getStoreSettings, updateStoreSettings, uploadStoreLogo } from '@/services/api/storeApi';
 
 const settingsSchema = z.object({
+  slug: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(2, 'Storefront name must be at least 2 characters long.')
+    .max(63, 'Storefront name cannot exceed 63 characters.')
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Use lowercase letters, numbers, and hyphens only.'),
   name: z.string().min(2, 'Store name must be at least 2 characters long.'),
   description: z.string().min(10, 'Store description must be at least 10 characters long.'),
   phone: z.string().min(7, 'Phone number is too short.'),
@@ -27,6 +35,8 @@ export default function SettingsPage() {
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
   const [logoFileName, setLogoFileName] = useState<string>('');
+  const [lastSavedSlug, setLastSavedSlug] = useState<string>('');
+  const hasHydratedFormRef = useRef(false);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['store-settings'],
@@ -36,9 +46,6 @@ export default function SettingsPage() {
 
   const updateStoreMutation = useMutation({
     mutationFn: updateStoreSettings,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['store-settings'] });
-    },
   });
   const uploadStoreLogoMutation = useMutation({
     mutationFn: uploadStoreLogo,
@@ -50,11 +57,13 @@ export default function SettingsPage() {
   const {
     register,
     reset,
+    watch,
     handleSubmit,
     formState: { errors },
   } = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsSchema),
     defaultValues: {
+      slug: '',
       name: '',
       description: '',
       phone: '',
@@ -67,12 +76,17 @@ export default function SettingsPage() {
       return;
     }
 
-    reset({
-      name: data.name,
-      description: data.description,
-      phone: data.phone,
-      address: data.address,
-    });
+    if (!hasHydratedFormRef.current) {
+      setLastSavedSlug(String(data.slug || '').trim().toLowerCase());
+      reset({
+        slug: data.slug,
+        name: data.name,
+        description: data.description,
+        phone: data.phone,
+        address: data.address,
+      });
+      hasHydratedFormRef.current = true;
+    }
   }, [data, reset]);
 
   useEffect(
@@ -86,14 +100,47 @@ export default function SettingsPage() {
 
   const displayedLogoPreviewUrl = logoPreviewUrl || data?.logoUrl || null;
   const displayedLogoFileName = logoFileName || (data?.logoUrl ? 'Current logo' : '');
-  const publicStoreUrl = data?.slug ? `${window.location.origin}/?store=${encodeURIComponent(data.slug)}` : '';
+  const draftSlug = String(watch('slug') || '').trim().toLowerCase();
+  const savedSlug = String(lastSavedSlug || data?.slug || '').trim().toLowerCase();
+  const publicStoreUrl = draftSlug ? buildStorefrontUrl(draftSlug, '/') : '';
+  const savedPublicStoreUrl = savedSlug ? buildStorefrontUrl(savedSlug, '/') : '';
+  const hasUnsavedSlugChange = Boolean(draftSlug && savedSlug && draftSlug !== savedSlug);
+  const isSlugLocked = Boolean(data?.requiresSlugChangePayment);
+  const rootDomain = typeof window !== 'undefined' ? getStorefrontRootDomain(window.location.hostname) : '';
 
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
     setFormSuccess(null);
 
     try {
-      await updateStoreMutation.mutateAsync(values);
+      const submittedSlug = values.slug.trim().toLowerCase();
+      const result = await updateStoreMutation.mutateAsync({
+        ...values,
+        slug: submittedSlug,
+      });
+
+      const persistedSlug = String(result.slug || submittedSlug).trim().toLowerCase();
+      setLastSavedSlug(persistedSlug);
+
+      queryClient.setQueryData(['store-settings'], {
+        ...result,
+        slug: persistedSlug,
+      });
+      reset({
+        slug: persistedSlug,
+        name: result.name,
+        description: result.description,
+        phone: result.phone,
+        address: result.address,
+      });
+
+      const latestSettings = await getStoreSettings();
+      const latestSlug = String(latestSettings.slug || '').trim().toLowerCase();
+      if (latestSlug && latestSlug !== submittedSlug) {
+        setFormError(`Slug save mismatch: requested "${submittedSlug}", server kept "${latestSlug}".`);
+        return;
+      }
+
       setFormSuccess('Store settings updated successfully.');
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : 'Unable to update store settings.';
@@ -155,6 +202,32 @@ export default function SettingsPage() {
           <CardContent>
             <form className="space-y-5" onSubmit={onSubmit}>
               <div className="grid gap-5 md:grid-cols-2">
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="store-slug">Storefront name</Label>
+                  <div className="flex items-center rounded-md border bg-background">
+                    <Input
+                      id="store-slug"
+                      className="border-0 shadow-none focus-visible:ring-0"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      readOnly={isSlugLocked}
+                      aria-disabled={isSlugLocked}
+                      {...register('slug')}
+                    />
+                    <span className="whitespace-nowrap pr-3 text-sm text-muted-foreground">
+                      .{rootDomain || 'localhost'}
+                    </span>
+                  </div>
+                  {errors.slug ? <p className="text-xs text-destructive">{errors.slug.message}</p> : null}
+                  {isSlugLocked ? (
+                    <p className="text-xs font-medium text-amber-700">
+                      You already used your free storefront URL change. Additional URL changes require payment.
+                    </p>
+                  ) : null}
+                  <p className="text-xs text-muted-foreground">Only this first part is editable. The domain suffix stays fixed.</p>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="store-name">Store name</Label>
                   <Input id="store-name" {...register('name')} />
@@ -180,17 +253,28 @@ export default function SettingsPage() {
                 {errors.address ? <p className="text-xs text-destructive">{errors.address.message}</p> : null}
               </div>
 
-              {data?.slug ? (
+              {publicStoreUrl ? (
                 <div className="space-y-2 rounded-lg border bg-slate-50 p-3">
                   <p className="text-xs font-medium text-muted-foreground">Public store URL</p>
                   <a
-                    href={publicStoreUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+                    href={savedPublicStoreUrl || '#'}
+                    target={hasUnsavedSlugChange ? undefined : '_blank'}
+                    rel={hasUnsavedSlugChange ? undefined : 'noreferrer'}
+                    className={`text-sm font-medium underline-offset-4 ${hasUnsavedSlugChange ? 'cursor-not-allowed text-muted-foreground' : 'text-primary hover:underline'
+                      }`}
+                    onClick={(event) => {
+                      if (hasUnsavedSlugChange) {
+                        event.preventDefault();
+                      }
+                    }}
                   >
-                    {publicStoreUrl}
+                    {hasUnsavedSlugChange ? publicStoreUrl : savedPublicStoreUrl}
                   </a>
+                  {hasUnsavedSlugChange ? (
+                    <p className="text-xs text-amber-600 font-medium">
+                      Link is disabled. Save settings to activate the new storefront URL.
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
 

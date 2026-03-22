@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
 import { loginCustomer, registerCustomer } from '@/features/storefront/api/storefrontApi';
+import { getStoreSlugFromLocation } from '@/lib/storefront-url';
 import type { AuthUser, LoginInput, RegisterInput } from '@/features/storefront/types';
 
 const STOREFRONT_SLUG_STORAGE_KEY = 'dhukuti:storefront:slug';
@@ -9,14 +10,9 @@ const ENV_STOREFRONT_SLUG = String(import.meta.env.VITE_STOREFRONT_SLUG || '').t
 
 function getActiveStoreSlug(): string {
   if (typeof window !== 'undefined') {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const slugFromUrl = String(params.get('store') || '').trim().toLowerCase();
-      if (slugFromUrl) {
-        return slugFromUrl;
-      }
-    } catch {
-      // Ignore malformed URLs.
+    const slugFromLocation = getStoreSlugFromLocation();
+    if (slugFromLocation) {
+      return slugFromLocation;
     }
 
     try {
@@ -126,7 +122,7 @@ export const useStorefrontAuthStore = create<StorefrontAuthState>()(
 
         // If the persisted auth belongs to a different store, clear it so credentials are not shared across stores.
         if (state.storeSlug && activeSlug && state.storeSlug !== activeSlug) {
-          set({
+          useStorefrontAuthStore.setState({
             user: null,
             token: '',
             isAuthenticated: false,
@@ -135,7 +131,7 @@ export const useStorefrontAuthStore = create<StorefrontAuthState>()(
             storeSlug: activeSlug,
           });
         } else if (!state.storeSlug) {
-          set({
+          useStorefrontAuthStore.setState({
             user: null,
             token: '',
             isAuthenticated: false,

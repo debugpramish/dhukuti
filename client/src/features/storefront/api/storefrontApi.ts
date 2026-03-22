@@ -1,6 +1,7 @@
 import { API_BASE_URL } from '@/services/api/httpClient';
 import { getAuthToken as getMerchantAuthToken } from '@/lib/auth';
 import { buildProductPlaceholderImage, normalizeProductImageUrl } from '@/lib/image';
+import { getStoreSlugFromLocation } from '@/lib/storefront-url';
 import type {
   AuthResponse,
   CmsPage,
@@ -101,17 +102,17 @@ function normalizeStore(payload: unknown): StorefrontStore | null {
     logoUrl: normalizeString(raw.logoUrl) || undefined,
     shippingRules: isRecord(raw.shippingRules)
       ? {
-          baseFee: Math.max(0, normalizeNumber(raw.shippingRules.baseFee, 100)),
-          freeShippingAbove: Math.max(0, normalizeNumber(raw.shippingRules.freeShippingAbove, 1000)),
-          codEnabled: normalizeBoolean(raw.shippingRules.codEnabled, true),
-          codFee: Math.max(0, normalizeNumber(raw.shippingRules.codFee, 50)),
-          defaultCourier: normalizeString(raw.shippingRules.defaultCourier, 'nepal-post'),
-          supportedCouriers: Array.isArray(raw.shippingRules.supportedCouriers)
-            ? raw.shippingRules.supportedCouriers
-                .map((entry) => normalizeString(entry))
-                .filter(Boolean)
-            : ['nepal-post', 'pathao', 'delivery-sathi'],
-        }
+        baseFee: Math.max(0, normalizeNumber(raw.shippingRules.baseFee, 100)),
+        freeShippingAbove: Math.max(0, normalizeNumber(raw.shippingRules.freeShippingAbove, 1000)),
+        codEnabled: normalizeBoolean(raw.shippingRules.codEnabled, true),
+        codFee: Math.max(0, normalizeNumber(raw.shippingRules.codFee, 50)),
+        defaultCourier: normalizeString(raw.shippingRules.defaultCourier, 'nepal-post'),
+        supportedCouriers: Array.isArray(raw.shippingRules.supportedCouriers)
+          ? raw.shippingRules.supportedCouriers
+            .map((entry) => normalizeString(entry))
+            .filter(Boolean)
+          : ['nepal-post', 'pathao', 'delivery-sathi'],
+      }
       : undefined,
   };
 }
@@ -215,8 +216,8 @@ function normalizeProduct(payload: unknown): StorefrontProduct {
 
   const variants = Array.isArray(raw.variants)
     ? raw.variants
-        .map((variant) => normalizeVariant(variant))
-        .filter((variant): variant is ProductVariant => variant !== null)
+      .map((variant) => normalizeVariant(variant))
+      .filter((variant): variant is ProductVariant => variant !== null)
     : [];
   const reviews = Array.isArray(raw.reviews)
     ? raw.reviews.map((review) => normalizeReview(review)).filter((review): review is ProductReview => review !== null)
@@ -424,16 +425,7 @@ function readStoreSlugFromStorage(): string {
 }
 
 function readStoreSlugFromUrl(): string {
-  if (typeof window === 'undefined') {
-    return '';
-  }
-
-  try {
-    const params = new URLSearchParams(window.location.search);
-    return normalizeStoreSlug(params.get('store'));
-  } catch {
-    return '';
-  }
+  return normalizeStoreSlug(getStoreSlugFromLocation());
 }
 
 async function resolveStoreSlugFromMerchantSession(): Promise<string> {
@@ -507,11 +499,18 @@ async function resolveStoreSlug(): Promise<string> {
 }
 
 async function resolveStore(): Promise<StorefrontStore> {
+  const currentSlug = await resolveStoreSlug();
+
+  // Clear cache if URL slug has changed
+  if (cachedStore && cachedStore.slug !== currentSlug) {
+    cachedStore = null;
+  }
+
   if (cachedStore) {
     return cachedStore;
   }
 
-  const slug = await resolveStoreSlug();
+  const slug = currentSlug;
   const payload = await storefrontRequest<unknown>(`/api/v1/public/stores/${encodeURIComponent(slug)}`, {
     method: 'GET',
   });
@@ -620,13 +619,13 @@ function normalizeOrder(payload: unknown): CustomerOrder {
 
   const shippingAddress = normalizeAddress(
     raw.shippingAddress ||
-      raw.address ||
-      raw.deliveryAddress || {
-        name: raw.customerName,
-        email: raw.customerEmail,
-        phone: raw.customerPhone,
-        address: raw.customerLocation,
-      },
+    raw.address ||
+    raw.deliveryAddress || {
+      name: raw.customerName,
+      email: raw.customerEmail,
+      phone: raw.customerPhone,
+      address: raw.customerLocation,
+    },
   );
   const subtotal = Math.max(0, normalizeNumber(raw.subtotal, items.reduce((sum, item) => sum + item.subtotal, 0)));
   const discountTotal = Math.max(0, normalizeNumber(raw.discountTotal || raw.couponDiscountTotal, 0));
@@ -698,16 +697,16 @@ function normalizeAuth(payload: unknown): AuthResponse {
     ? userRecord.addresses.map((address) => normalizeAddress(address))
     : normalizeString(userRecord.address)
       ? [
-          {
-            name: normalizeString(userRecord.name || userRecord.fullName),
-            email: normalizeString(userRecord.email),
-            phone: normalizeString(userRecord.phone),
-            address: normalizeString(userRecord.address),
-            city: '',
-            postalCode: '',
-            country: 'Nepal',
-          } satisfies ShippingAddress,
-        ]
+        {
+          name: normalizeString(userRecord.name || userRecord.fullName),
+          email: normalizeString(userRecord.email),
+          phone: normalizeString(userRecord.phone),
+          address: normalizeString(userRecord.address),
+          city: '',
+          postalCode: '',
+          country: 'Nepal',
+        } satisfies ShippingAddress,
+      ]
       : undefined;
 
   return {
@@ -1136,9 +1135,9 @@ export async function validateCoupon(code: string, total: number, token?: string
     const response = await storefrontRequest<unknown>(
       `/api/v1/public/stores/${encodeURIComponent(storeSlug)}/coupons/validate`,
       {
-      method: 'POST',
-      body: JSON.stringify({ code: normalizedCode, total }),
-      token,
+        method: 'POST',
+        body: JSON.stringify({ code: normalizedCode, total }),
+        token,
       },
     );
 

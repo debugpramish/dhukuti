@@ -25,7 +25,9 @@ export async function ensureMerchantStore(userId: string): Promise<StoreDocument
   const defaultName = user?.name ? `${user.name}'s Store` : 'My Store';
   const fallbackSlug = buildStoreSlug(defaultName, userId);
 
-  let store = await StoreModel.findOne({ ownerId: userId });
+  // Resolve a single canonical store document deterministically to avoid
+  // non-deterministic findOne() behavior if legacy duplicate rows exist.
+  let store = await StoreModel.findOne({ ownerId: userId }).sort({ updatedAt: -1, createdAt: -1 });
   if (!store) {
     store = await StoreModel.create({
       ownerId: userId,

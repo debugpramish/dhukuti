@@ -1,4 +1,4 @@
-import { getAuthToken } from '@/lib/auth';
+import { clearAuthSession, getAuthToken } from '@/lib/auth';
 
 const rawApiUrl = import.meta.env.VITE_API_URL;
 const API_V1_PREFIX = '/api/v1';
@@ -126,7 +126,16 @@ export async function httpRequest<TResponse>(path: string, init: ApiRequestInit 
   const payload = await parseResponsePayload(response);
 
   if (!response.ok) {
-    throw new ApiError(extractErrorMessage(payload), response.status);
+    const message = extractErrorMessage(payload);
+
+    if (
+      response.status === 401 &&
+      /token|authorization|invalid|expired/i.test(message)
+    ) {
+      clearAuthSession();
+    }
+
+    throw new ApiError(message, response.status);
   }
 
   return payload as TResponse;

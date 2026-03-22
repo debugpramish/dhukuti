@@ -33,6 +33,9 @@ function normalizeStore(payload: StoreSettingsPayload): StoreSettings {
 
   return {
     slug: store.slug || '',
+    slugChangeCount: Math.max(0, Number(store.slugChangeCount ?? 0)),
+    paidSlugChangeCredits: Math.max(0, Number(store.paidSlugChangeCredits ?? 0)),
+    requiresSlugChangePayment: Boolean(store.requiresSlugChangePayment),
     name: store.name || '',
     description: store.description || '',
     phone: store.phone || '',

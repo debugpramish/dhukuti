@@ -5,7 +5,7 @@ import path from 'path';
 import StoreModel, { STORE_COURIER_VALUES, type StoreShippingRules } from '../models/store.model';
 import { requireAuth, requireMerchant } from '../middleware/auth.middleware';
 import { getStoreLogoPublicId, uploadImageBuffer } from '../services/cloudinary.service';
-import { ensureMerchantDemoData, ensureMerchantStore } from '../services/merchant-data.service';
+import { ensureMerchantStore } from '../services/merchant-data.service';
 import { updateStoreSettingsSchema } from '../validation/store.validation';
 
 const storeRouter = express.Router();
@@ -65,6 +65,8 @@ async function removeUploadedLogoIfPresent(logoUrl: string): Promise<void> {
 
 function toStoreResponse(store: {
   slug: string;
+  slugChangeCount?: number;
+  paidSlugChangeCredits?: number;
   name: string;
   description: string;
   phone: string;
@@ -86,6 +88,9 @@ function toStoreResponse(store: {
 
   return {
     slug: store.slug,
+    slugChangeCount: Math.max(0, Number(store.slugChangeCount ?? 0)),
+    paidSlugChangeCredits: Math.max(0, Number(store.paidSlugChangeCredits ?? 0)),
+    requiresSlugChangePayment: Math.max(0, Number(store.slugChangeCount ?? 0)) >= 1 && Math.max(0, Number(store.paidSlugChangeCredits ?? 0)) <= 0,
     name: store.name,
     description: store.description,
     phone: store.phone,
@@ -101,9 +106,7 @@ storeRouter.get('/settings', requireAuth, requireMerchant, async (req, res) => {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    await ensureMerchantDemoData(req.userId);
-
-    const store = await StoreModel.findOne({ ownerId: req.userId });
+    const store = await ensureMerchantStore(req.userId);
     if (!store) {
       return res.status(404).json({ message: 'Store settings not found' });
     }
@@ -141,24 +144,80 @@ storeRouter.put('/settings', requireAuth, requireMerchant, async (req, res) => {
 
     const store = await ensureMerchantStore(req.userId);
 
-    store.name = parsed.data.name;
-    store.description = parsed.data.description;
-    store.phone = parsed.data.phone;
-    store.address = parsed.data.address;
-    await store.save();
+    const hasSlugInPayload = Object.prototype.hasOwnProperty.call(parsed.data, 'slug');
+    const nextSlug = hasSlugInPayload && typeof parsed.data.slug === 'string'
+      ? parsed.data.slug.trim().toLowerCase()
+      : store.slug;
+    const isSlugChangeRequested = hasSlugInPayload && nextSlug !== store.slug;
+    const slugChangeCount = Math.max(0, Number(store.slugChangeCount ?? 0));
+    const paidSlugChangeCredits = Math.max(0, Number(store.paidSlugChangeCredits ?? 0));
+    const hasFreeSlugChangeRemaining = slugChangeCount < 1;
+    const canUsePaidSlugChangeCredit = paidSlugChangeCredits > 0;
+    const canChangeSlug = hasFreeSlugChangeRemaining || canUsePaidSlugChangeCredit;
+
+    if (isSlugChangeRequested && !canChangeSlug) {
+      return res.status(402).json({
+        message: 'You have already used your free storefront URL change. Additional URL changes require payment.',
+      });
+    }
+
+    console.log('[store-settings:update] request', {
+      userId: req.userId,
+      incomingSlug: hasSlugInPayload ? parsed.data.slug : undefined,
+      previousSlug: store.slug,
+      nextSlug,
+    });
+
+    const updateDocument: {
+      $set: Record<string, unknown>;
+      $inc?: Record<string, number>;
+    } = {
+      $set: {
+        ...(hasSlugInPayload ? { slug: nextSlug } : {}),
+        name: parsed.data.name,
+        description: parsed.data.description,
+        phone: parsed.data.phone,
+        address: parsed.data.address,
+      },
+    };
+
+    if (isSlugChangeRequested) {
+      updateDocument.$inc = {
+        slugChangeCount: 1,
+        ...(hasFreeSlugChangeRemaining ? {} : { paidSlugChangeCredits: -1 }),
+      };
+    }
+
+    const updatedStore = await StoreModel.findByIdAndUpdate(store._id, updateDocument, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!updatedStore) {
+      return res.status(404).json({ message: 'Store settings not found' });
+    }
+
+    console.log('[store-settings:update] persisted', {
+      userId: req.userId,
+      persistedSlug: updatedStore.slug,
+    });
 
     return res.status(200).json({
       store: toStoreResponse({
-        slug: store.slug,
-        name: store.name,
-        description: store.description,
-        phone: store.phone,
-        address: store.address,
-        logoUrl: store.logoUrl,
-        shippingRules: store.shippingRules,
+        slug: updatedStore.slug,
+        name: updatedStore.name,
+        description: updatedStore.description,
+        phone: updatedStore.phone,
+        address: updatedStore.address,
+        logoUrl: updatedStore.logoUrl,
+        shippingRules: updatedStore.shippingRules,
       }),
     });
   } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && (error as { code?: number }).code === 11000) {
+      return res.status(409).json({ message: 'Storefront name is unavailable. Please choose another one.' });
+    }
+
     console.error('Update store settings error:', error);
     return res.status(500).json({ message: 'Unable to update store settings' });
   }
