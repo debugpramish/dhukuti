@@ -120,6 +120,13 @@ export function getStoreSlugFromLocation(): string {
         return slugFromHost;
     }
 
+    // Free-domain friendly URL support: /store/<slug>
+    const pathMatch = window.location.pathname.match(/^\/store\/([a-z0-9][a-z0-9-]*)(?:\/|$)/i);
+    if (pathMatch?.[1]) {
+        const slugFromPath = normalizeSlug(pathMatch[1]);
+        return isValidStoreSlug(slugFromPath) ? slugFromPath : '';
+    }
+
     // Backward compatibility for old links that still use ?store=slug.
     try {
         const params = new URLSearchParams(window.location.search);
@@ -164,9 +171,13 @@ export function buildStorefrontUrl(slug: string, pathname = '/storefront', locat
 
     const normalizedPath = pathname.startsWith('/') ? pathname : `/${pathname}`;
     if (shouldUseQueryStoreParam(locationLike)) {
-        const url = new URL(normalizedPath, origin);
-        url.searchParams.set('store', normalizedSlug);
-        return url.toString();
+        // On platforms without wildcard subdomain support (e.g. free vercel.app),
+        // keep URLs clean by encoding slug in the path instead of query params.
+        if (normalizedPath === '/' || normalizedPath === '/storefront') {
+            return `${origin}/store/${normalizedSlug}`;
+        }
+
+        return `${origin}/store/${normalizedSlug}${normalizedPath}`;
     }
 
     return `${origin}${normalizedPath}`;

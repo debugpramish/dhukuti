@@ -1,5 +1,5 @@
 import { Suspense, lazy, type ReactNode } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import AppErrorBoundary from '@/components/common/AppErrorBoundary';
@@ -71,35 +71,37 @@ function RootEntry() {
 function LegacyStoreRedirect() {
   const { slug } = useParams();
   const wildcardPath = useParams()['*'] || '';
-  const location = useLocation();
 
   const normalizedSlug = String(slug || '').trim().toLowerCase();
   if (!normalizedSlug) {
     return <Navigate to="/storefront" replace />;
   }
 
-  const nextSearch = new URLSearchParams(location.search);
-  nextSearch.set('store', normalizedSlug);
-  const searchSuffix = nextSearch.toString() ? `?${nextSearch.toString()}` : '';
+  try {
+    window.localStorage.setItem('dhukuti:storefront:slug', normalizedSlug);
+  } catch {
+    // Ignore storage write errors and continue with route fallback.
+  }
+
   const normalizedPath = wildcardPath.replace(/^\/+/, '').toLowerCase();
 
   if (!normalizedPath) {
-    return <Navigate to={`/storefront${searchSuffix}`} replace />;
+    return <Navigate to="/storefront" replace />;
   }
 
   if (normalizedPath.startsWith('catalog')) {
-    return <Navigate to={`/shop${searchSuffix}`} replace />;
+    return <Navigate to="/shop" replace />;
   }
 
   if (normalizedPath.startsWith('account')) {
-    return <Navigate to={`/account${searchSuffix}`} replace />;
+    return <Navigate to="/account" replace />;
   }
 
   if (normalizedPath.startsWith('contact')) {
-    return <Navigate to={`/contact${searchSuffix}`} replace />;
+    return <Navigate to="/contact" replace />;
   }
 
-  return <Navigate to={`/storefront${searchSuffix}`} replace />;
+  return <Navigate to="/storefront" replace />;
 }
 
 const queryClient = new QueryClient({
