@@ -42,6 +42,15 @@ function resolveRootDomain(hostname: string): string {
 }
 
 function shouldUseQueryStoreParam(locationLike: Location): boolean {
+    const normalizedHost = locationLike.hostname.trim().toLowerCase();
+    const rootDomain = resolveRootDomain(normalizedHost);
+
+    // Free Vercel project domains do not support arbitrary wildcard merchant
+    // subdomains over TLS, so always use non-subdomain storefront URLs here.
+    if (normalizedHost.endsWith('.vercel.app') && (!rootDomain || rootDomain.endsWith('.vercel.app'))) {
+        return true;
+    }
+
     if (ENV_STOREFRONT_URL_MODE === 'query') {
         return true;
     }
@@ -49,9 +58,6 @@ function shouldUseQueryStoreParam(locationLike: Location): boolean {
     if (ENV_STOREFRONT_URL_MODE === 'subdomain') {
         return false;
     }
-
-    const normalizedHost = locationLike.hostname.trim().toLowerCase();
-    const rootDomain = resolveRootDomain(normalizedHost);
 
     // Vercel default project domains do not include wildcard cert coverage for
     // arbitrary merchant subdomains (e.g. <slug>.<project>.vercel.app).
