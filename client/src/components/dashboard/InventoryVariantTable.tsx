@@ -1,33 +1,18 @@
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { Product, ProductVariant } from '@/services/api/types';
 
-const lowStockLabel = 'Low stock';
-
-function formatStockLabel(variant: ProductVariant): string {
-  if (variant.stock <= 0) {
-    return 'Out of stock';
+function rowStatus(variant: ProductVariant): 'Critical' | 'Warning' | 'Healthy' {
+  if (variant.stock <= Math.max(1, variant.lowStockThreshold * 0.3)) {
+    return 'Critical';
   }
 
   if (variant.stock <= variant.lowStockThreshold) {
-    return lowStockLabel;
+    return 'Warning';
   }
 
   return 'Healthy';
-}
-
-function stockBadgeVariant(variant: ProductVariant): 'destructive' | 'warning' | 'success' {
-  if (variant.stock <= 0) {
-    return 'destructive';
-  }
-
-  if (variant.stock <= variant.lowStockThreshold) {
-    return 'warning';
-  }
-
-  return 'success';
 }
 
 export type InventoryVariantTableProps = {
@@ -53,68 +38,97 @@ export default function InventoryVariantTable({
     );
   }
 
+  const rows = products.flatMap((product) =>
+    product.variants.map((variant) => ({
+      product,
+      variant,
+    })),
+  );
+
   return (
-    <div className="space-y-4">
-      {products.map((product) => (
-        <Card key={product.id}>
-          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="text-lg">{product.title}</CardTitle>
-              <p className="text-sm text-muted-foreground">{product.variants.length} variant(s)</p>
-            </div>
-            <Button type="button" size="sm" onClick={() => onCreateVariant(product)}>
-              Add Variant
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {product.variants.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No variants yet. Add a variant to track stock.</p>
-            ) : (
-              <div className="rounded-lg border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>SKU</TableHead>
-                      <TableHead>Variant</TableHead>
-                      <TableHead className="text-right">Stock</TableHead>
-                      <TableHead className="text-right">Low stock threshold</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Default</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+    <Card className="border-slate-200 shadow-none">
+      <CardContent className="p-0">
+        {rows.length === 0 ? (
+          <div className="px-6 py-10 text-center">
+            <p className="text-sm text-slate-500">No variants yet. Add a variant to track stock.</p>
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-slate-200">
+            <Table>
+              <TableHeader className="[&_tr]:border-b-0">
+                <TableRow className="bg-slate-50 hover:bg-slate-50">
+                  <TableHead className="h-11 px-6 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Product</TableHead>
+                  <TableHead className="h-11 px-6 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Variant</TableHead>
+                  <TableHead className="h-11 px-6 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">SKU</TableHead>
+                  <TableHead className="h-11 px-6 text-right text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Stock</TableHead>
+                  <TableHead className="h-11 px-6 text-right text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Threshold</TableHead>
+                  <TableHead className="h-11 px-6 text-center text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Status</TableHead>
+                  <TableHead className="h-11 px-6 text-right text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map(({ product, variant }) => {
+                  const status = rowStatus(variant);
+                  const statusClassName =
+                    status === 'Critical'
+                      ? 'bg-red-50 text-red-600'
+                      : status === 'Warning'
+                        ? 'bg-amber-50 text-amber-600'
+                        : 'bg-emerald-50 text-emerald-600';
+
+                  return (
+                    <TableRow key={variant.id} className="border-slate-100 hover:bg-slate-50">
+                      <TableCell className="px-6 py-3.5 font-semibold text-slate-900">{product.title}</TableCell>
+                      <TableCell className="px-6 py-3.5 text-slate-600">{variant.name || 'Default'}</TableCell>
+                      <TableCell className="px-6 py-3.5">
+                        <code className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{variant.sku}</code>
+                      </TableCell>
+                      <TableCell className="px-6 py-3.5 text-right font-semibold tabular-nums text-slate-900">{variant.stock}</TableCell>
+                      <TableCell className="px-6 py-3.5 text-right tabular-nums text-slate-500">{variant.lowStockThreshold}</TableCell>
+                      <TableCell className="px-6 py-3.5 text-center">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${statusClassName}`}>
+                          {status}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-6 py-3.5 text-right">
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 rounded-md border-slate-200 px-2.5 text-xs font-semibold text-slate-600"
+                            onClick={() => onEditVariant(product, variant)}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            className="h-7 rounded-md bg-blue-50 px-2.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                            onClick={() => onAdjustStock(product, variant)}
+                          >
+                            Adjust
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 rounded-md px-2.5 text-xs font-semibold text-slate-500 hover:bg-slate-100"
+                            onClick={() => onCreateVariant(product)}
+                          >
+                            Add
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {product.variants.map((variant) => (
-                      <TableRow key={variant.id}>
-                        <TableCell className="font-medium">{variant.sku}</TableCell>
-                        <TableCell>{variant.name || 'Default'}</TableCell>
-                        <TableCell className="text-right">{variant.stock}</TableCell>
-                        <TableCell className="text-right">{variant.lowStockThreshold}</TableCell>
-                        <TableCell>
-                          <Badge variant={stockBadgeVariant(variant)}>{formatStockLabel(variant)}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          {variant.isDefault ? <Badge variant="info">Default</Badge> : <Badge variant="muted">No</Badge>}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex flex-wrap justify-end gap-2">
-                            <Button type="button" size="sm" variant="outline" onClick={() => onEditVariant(product, variant)}>
-                              Edit
-                            </Button>
-                            <Button type="button" size="sm" variant="secondary" onClick={() => onAdjustStock(product, variant)}>
-                              Adjust
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      ))}
-    </div>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

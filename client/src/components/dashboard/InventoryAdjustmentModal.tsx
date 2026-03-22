@@ -113,14 +113,20 @@ export default function InventoryAdjustmentModal({
   });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} title={title} description={description}>
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={title}
+      description={description}
+      className="max-w-md rounded-2xl border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]"
+    >
       <form className="space-y-4" onSubmit={submitHandler}>
         <div className="space-y-2">
-          <Label htmlFor="adjustment-type">Adjustment type</Label>
+          <Label htmlFor="adjustment-type" className="text-slate-700">Adjustment type</Label>
           <select
             id="adjustment-type"
             {...register('adjustmentType')}
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            className="h-10 w-full rounded-md border border-slate-200 bg-background px-3 text-sm"
           >
             <option value="set">Set stock</option>
             <option value="increase">Increase stock</option>
@@ -129,23 +135,24 @@ export default function InventoryAdjustmentModal({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="adjustment-quantity">Quantity</Label>
+          <Label htmlFor="adjustment-quantity" className="text-slate-700">Quantity</Label>
           <Input
             id="adjustment-quantity"
             type="number"
             min="0"
             step="1"
+            className="border-slate-200"
             {...register('quantity', { valueAsNumber: true })}
           />
           {errors.quantity ? <p className="text-xs text-destructive">{errors.quantity.message}</p> : null}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="adjustment-reason">Reason</Label>
+          <Label htmlFor="adjustment-reason" className="text-slate-700">Reason</Label>
           <select
             id="adjustment-reason"
             {...register('reason')}
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            className="h-10 w-full rounded-md border border-slate-200 bg-background px-3 text-sm"
           >
             {manualReasonOptions.map((reason) => (
               <option key={reason} value={reason}>
@@ -156,18 +163,24 @@ export default function InventoryAdjustmentModal({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="adjustment-note">Note</Label>
-          <Input id="adjustment-note" placeholder="Optional note" {...register('note')} />
+          <Label htmlFor="adjustment-note" className="text-slate-700">Note</Label>
+          <Input id="adjustment-note" placeholder="Optional note" className="border-slate-200" {...register('note')} />
           {errors.note ? <p className="text-xs text-destructive">{errors.note.message}</p> : null}
         </div>
 
         {submitError ? <p className="text-sm text-destructive">{submitError}</p> : null}
 
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+          <Button
+            type="button"
+            variant="outline"
+            className="rounded-lg border-slate-200 text-slate-600"
+            onClick={() => onOpenChange(false)}
+            disabled={isSubmitting}
+          >
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" className="rounded-lg bg-blue-600 text-white hover:bg-blue-700" disabled={isSubmitting}>
             {isSubmitting ? 'Saving...' : 'Apply Adjustment'}
           </Button>
         </div>

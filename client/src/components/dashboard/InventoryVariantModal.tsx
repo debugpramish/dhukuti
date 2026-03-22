@@ -131,28 +131,35 @@ export default function InventoryVariantModal({
   });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} title={title} description={description}>
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={title}
+      description={description}
+      className="max-w-lg rounded-2xl border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]"
+    >
       <form className="space-y-4" onSubmit={submitHandler}>
         <div className="space-y-2">
-          <Label htmlFor="variant-sku">SKU</Label>
-          <Input id="variant-sku" {...register('sku')} />
+          <Label htmlFor="variant-sku" className="text-slate-700">SKU</Label>
+          <Input id="variant-sku" className="border-slate-200" {...register('sku')} />
           {errors.sku ? <p className="text-xs text-destructive">{errors.sku.message}</p> : null}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="variant-name">Variant name</Label>
-          <Input id="variant-name" placeholder="Default" {...register('name')} />
+          <Label htmlFor="variant-name" className="text-slate-700">Variant name</Label>
+          <Input id="variant-name" placeholder="Default" className="border-slate-200" {...register('name')} />
           {errors.name ? <p className="text-xs text-destructive">{errors.name.message}</p> : null}
         </div>
 
         {mode === 'create' ? (
           <div className="space-y-2">
-            <Label htmlFor="variant-stock">Opening stock</Label>
+            <Label htmlFor="variant-stock" className="text-slate-700">Opening stock</Label>
             <Input
               id="variant-stock"
               type="number"
               min="0"
               step="1"
+              className="border-slate-200"
               {...register('stock', { valueAsNumber: true })}
             />
             {errors.stock ? <p className="text-xs text-destructive">{errors.stock.message}</p> : null}
@@ -160,12 +167,13 @@ export default function InventoryVariantModal({
         ) : null}
 
         <div className="space-y-2">
-          <Label htmlFor="variant-threshold">Low stock threshold</Label>
+          <Label htmlFor="variant-threshold" className="text-slate-700">Low stock threshold</Label>
           <Input
             id="variant-threshold"
             type="number"
             min="0"
             step="1"
+            className="border-slate-200"
             {...register('lowStockThreshold', { valueAsNumber: true })}
           />
           {errors.lowStockThreshold ? (
@@ -173,18 +181,24 @@ export default function InventoryVariantModal({
           ) : null}
         </div>
 
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" className="h-4 w-4" {...register('isDefault')} />
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" className="h-4 w-4 rounded border-slate-300" {...register('isDefault')} />
           Make this the default variant
         </label>
 
         {submitError ? <p className="text-sm text-destructive">{submitError}</p> : null}
 
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+          <Button
+            type="button"
+            variant="outline"
+            className="rounded-lg border-slate-200 text-slate-600"
+            onClick={() => onOpenChange(false)}
+            disabled={isSubmitting}
+          >
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" className="rounded-lg bg-blue-600 text-white hover:bg-blue-700" disabled={isSubmitting}>
             {isSubmitting ? 'Saving...' : 'Save Variant'}
           </Button>
         </div>

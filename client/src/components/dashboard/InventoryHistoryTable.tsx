@@ -64,19 +64,15 @@ export default function InventoryHistoryTable({ history, productTitleById, varia
   }
 
   return (
-    <div className="rounded-lg border">
+    <div className="overflow-hidden rounded-lg border border-slate-200">
       <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Date</TableHead>
-            <TableHead>Product</TableHead>
-            <TableHead>Variant</TableHead>
-            <TableHead>SKU</TableHead>
-            <TableHead className="text-right">Change</TableHead>
-            <TableHead className="text-right">Before</TableHead>
-            <TableHead className="text-right">After</TableHead>
-            <TableHead>Reason</TableHead>
-            <TableHead>Note</TableHead>
+        <TableHeader className="[&_tr]:border-b-0">
+          <TableRow className="bg-slate-50 hover:bg-slate-50">
+            <TableHead className="h-11 px-6 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Date</TableHead>
+            <TableHead className="h-11 px-6 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Product</TableHead>
+            <TableHead className="h-11 px-6 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Variant</TableHead>
+            <TableHead className="h-11 px-6 text-right text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Change</TableHead>
+            <TableHead className="h-11 px-6 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Reason</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -88,20 +84,14 @@ export default function InventoryHistoryTable({ history, productTitleById, varia
               entry.change < 0 ? 'text-destructive' : entry.change > 0 ? 'text-emerald-600' : 'text-muted-foreground';
 
             return (
-              <TableRow key={entry.id}>
-                <TableCell>{formatDate(entry.createdAt)}</TableCell>
-                <TableCell className="font-medium">{productTitle}</TableCell>
-                <TableCell>{variantName}</TableCell>
-                <TableCell>{entry.sku}</TableCell>
-                <TableCell className={`text-right ${changeClass}`}>
-                  {changeLabel}
-                </TableCell>
-                <TableCell className="text-right">{entry.stockBefore}</TableCell>
-                <TableCell className="text-right">{entry.stockAfter}</TableCell>
-                <TableCell>
+              <TableRow key={entry.id} className="border-slate-100 hover:bg-slate-50">
+                <TableCell className="px-6 py-3.5 tabular-nums text-slate-500">{formatDate(entry.createdAt)}</TableCell>
+                <TableCell className="px-6 py-3.5 font-semibold text-slate-900">{productTitle}</TableCell>
+                <TableCell className="px-6 py-3.5 text-slate-600">{variantName}</TableCell>
+                <TableCell className={`px-6 py-3.5 text-right font-semibold tabular-nums ${changeClass}`}>{changeLabel}</TableCell>
+                <TableCell className="px-6 py-3.5">
                   <Badge variant={reasonBadgeVariant(entry.reason)}>{formatReason(entry.reason)}</Badge>
                 </TableCell>
-                <TableCell>{entry.note || '-'}</TableCell>
               </TableRow>
             );
           })}
