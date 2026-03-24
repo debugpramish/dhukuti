@@ -219,6 +219,37 @@ export type CustomerReport = {
   rows: CustomerReportRow[];
 };
 
+export type StoreCustomer = {
+  id: string;
+  storeId: string;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type StoreCustomerPagination = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNextPage: boolean;
+};
+
+export type StoreCustomerListResult = {
+  customers: StoreCustomer[];
+  pagination: StoreCustomerPagination;
+};
+
+export type StoreCustomerListQuery = {
+  slug?: string;
+  page?: number;
+  limit?: number;
+  search?: string;
+};
+
 export type DashboardReportPayload =
   | SalesReport
   | TaxReport

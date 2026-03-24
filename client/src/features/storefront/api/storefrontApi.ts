@@ -6,6 +6,7 @@ import type {
   AuthResponse,
   CmsPage,
   CheckoutBill,
+  CheckoutPolicy,
   CheckoutPayload,
   CheckoutResponse,
   CustomerOrder,
@@ -669,6 +670,40 @@ function normalizeCheckoutBill(payload: unknown): CheckoutBill {
     codFee: Math.max(0, normalizeNumber(raw.codFee, 0)),
     paymentMethod,
     total: Math.max(0, normalizeNumber(raw.total, 0)),
+    policy: normalizeCheckoutPolicy(raw.policy),
+  };
+}
+
+function normalizeCheckoutPolicy(payload: unknown): CheckoutPolicy | undefined {
+  if (!isRecord(payload)) {
+    return undefined;
+  }
+
+  const modeRaw = normalizeString(payload.mode).toLowerCase();
+  const mode: CheckoutPolicy['mode'] =
+    modeRaw === 'partial_prepay' || modeRaw === 'prepaid_only' ? modeRaw : 'cod_allowed';
+
+  const riskBandRaw = normalizeString(payload.riskBand).toLowerCase();
+  const riskBand: CheckoutPolicy['riskBand'] =
+    riskBandRaw === 'medium' || riskBandRaw === 'high' ? riskBandRaw : 'low';
+
+  const allowedPaymentMethods = Array.isArray(payload.allowedPaymentMethods)
+    ? payload.allowedPaymentMethods
+      .map((entry) => normalizeString(entry).toLowerCase())
+      .filter((entry): entry is CheckoutPolicy['allowedPaymentMethods'][number] =>
+        entry === 'cod' || entry === 'esewa' || entry === 'khalti',
+      )
+    : [];
+
+  return {
+    trustScore: Math.max(0, Math.min(100, Math.round(normalizeNumber(payload.trustScore, 50)))),
+    riskBand,
+    mode,
+    allowedPaymentMethods: allowedPaymentMethods.length > 0 ? allowedPaymentMethods : ['cod', 'esewa', 'khalti'],
+    codRequiresPrepay: normalizeBoolean(payload.codRequiresPrepay, mode === 'partial_prepay'),
+    requiredPrepayRatio: Math.max(0, Math.min(1, normalizeNumber(payload.requiredPrepayRatio, 0))),
+    requiredPrepayAmount: Math.max(0, normalizeNumber(payload.requiredPrepayAmount, 0)),
+    reason: normalizeString(payload.reason) || 'Payment options adjusted for checkout safety.',
   };
 }
 

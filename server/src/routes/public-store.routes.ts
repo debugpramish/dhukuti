@@ -13,6 +13,7 @@ import {
   markAbandonedCheckoutRecovered,
   recordAbandonedCheckout,
 } from '../services/abandoned-checkout.service';
+import { evaluateCodTrustPolicy, type CodTrustEvaluation } from '../services/cod-trust.service';
 import { trackStoreAnalyticsEventsSchema } from '../validation/analytics.validation';
 import { createStoreContactMessageSchema } from '../validation/store-contact.validation';
 import { createPublicOrderSchema, type CreatePublicOrderInput } from '../validation/public-order.validation';
@@ -451,10 +452,10 @@ function toShipmentResponse(shipment: {
     lastUpdatedAt: shipment.lastUpdatedAt,
     history: Array.isArray(shipment.history)
       ? shipment.history.map((entry) => ({
-          status: entry.status,
-          timestamp: entry.timestamp,
-          note: entry.note,
-        }))
+        status: entry.status,
+        timestamp: entry.timestamp,
+        note: entry.note,
+      }))
       : [],
   };
 }
@@ -664,6 +665,35 @@ type CheckoutQuote = {
     stockAfter: number;
   }>;
 };
+
+function normalizeCheckoutPolicy(policy: CodTrustEvaluation) {
+  return {
+    trustScore: policy.trustScore,
+    riskBand: policy.riskBand,
+    mode: policy.mode,
+    allowedPaymentMethods: policy.allowedPaymentMethods,
+    codRequiresPrepay: policy.codRequiresPrepay,
+    requiredPrepayRatio: policy.requiredPrepayRatio,
+    requiredPrepayAmount: policy.requiredPrepayAmount,
+    reason: policy.reason,
+  };
+}
+
+function isPaymentMethodAllowed(policy: CodTrustEvaluation, paymentMethod: 'cod' | 'esewa' | 'khalti'): boolean {
+  return policy.allowedPaymentMethods.includes(paymentMethod);
+}
+
+function getFallbackPaymentMethod(policy: CodTrustEvaluation): 'cod' | 'esewa' | 'khalti' {
+  if (policy.allowedPaymentMethods.includes('cod')) {
+    return 'cod';
+  }
+
+  if (policy.allowedPaymentMethods.includes('esewa')) {
+    return 'esewa';
+  }
+
+  return 'khalti';
+}
 
 type NormalizedShippingRules = {
   baseFee: number;
@@ -1111,10 +1141,10 @@ publicStoreRouter.get('/stores/:slug/products/:productSlug', async (req, res) =>
     const isObjectId = /^[a-fA-F0-9]{24}$/.test(rawProductSlug);
     const productById = isObjectId
       ? await ProductModel.findOne({
-          _id: rawProductSlug,
-          ownerId: store.ownerId,
-          status: 'active',
-        })
+        _id: rawProductSlug,
+        ownerId: store.ownerId,
+        status: 'active',
+      })
       : null;
 
     let product = productById;
@@ -1432,6 +1462,12 @@ publicStoreRouter.post(
         shippingRules,
       });
 
+      const policy = await evaluateCodTrustPolicy({
+        ownerId: store.ownerId.toString(),
+        customerId: customer._id.toString(),
+        orderTotal: quote.total,
+      });
+
       await StoreAnalyticsEventModel.create({
         ownerId: store.ownerId,
         storeSlug: slug,
@@ -1474,24 +1510,24 @@ publicStoreRouter.post(
       const gatewayPayload =
         provider === 'esewa'
           ? {
-              merchantCode: 'EPAYTEST',
-              transactionUuid: paymentSession.id,
-              amount: paymentSession.amount,
-              productServiceCharge: 0,
-              productDeliveryCharge: 0,
-              taxAmount: 0,
-              successUrl: `/store/${slug}/catalog?payment=success`,
-              failureUrl: `/store/${slug}/catalog?payment=failed`,
-            }
+            merchantCode: 'EPAYTEST',
+            transactionUuid: paymentSession.id,
+            amount: paymentSession.amount,
+            productServiceCharge: 0,
+            productDeliveryCharge: 0,
+            taxAmount: 0,
+            successUrl: `/store/${slug}/catalog?payment=success`,
+            failureUrl: `/store/${slug}/catalog?payment=failed`,
+          }
           : {
-              publicKey: 'test_public_key_khalti',
-              pidx: paymentSession.id,
-              amountPaisa: Math.round(paymentSession.amount * 100),
-              purchaseOrderName: `Order for ${slug}`,
-              purchaseOrderId: paymentSession.id,
-              returnUrl: `/store/${slug}/catalog?payment=success`,
-              websiteUrl: `/store/${slug}`,
-            };
+            publicKey: 'test_public_key_khalti',
+            pidx: paymentSession.id,
+            amountPaisa: Math.round(paymentSession.amount * 100),
+            purchaseOrderName: `Order for ${slug}`,
+            purchaseOrderId: paymentSession.id,
+            returnUrl: `/store/${slug}/catalog?payment=success`,
+            websiteUrl: `/store/${slug}`,
+          };
 
       return res.status(200).json({
         payment: {
@@ -1512,6 +1548,7 @@ publicStoreRouter.post(
           codFee: quote.codFee,
           paymentMethod: quote.paymentMethod,
           total: quote.total,
+          policy: normalizeCheckoutPolicy(policy),
         },
       });
     } catch (error) {
@@ -1615,6 +1652,26 @@ publicStoreRouter.post('/stores/:slug/orders/preview', resolveStore, requireAuth
       shippingRules,
     });
 
+    const policy = await evaluateCodTrustPolicy({
+      ownerId: store.ownerId.toString(),
+      customerId: req.customerId,
+      orderTotal: quote.total,
+    });
+
+    let effectiveQuote = quote;
+    let requestedPaymentAdjusted = false;
+    if (!isPaymentMethodAllowed(policy, quote.paymentMethod)) {
+      requestedPaymentAdjusted = true;
+      const fallbackPaymentMethod = getFallbackPaymentMethod(policy);
+      effectiveQuote = await buildCheckoutQuote({
+        ownerId: store.ownerId.toString(),
+        items: parsed.data.items,
+        couponCode: parsed.data.couponCode,
+        paymentMethod: fallbackPaymentMethod,
+        shippingRules,
+      });
+    }
+
     await recordAbandonedCheckout({
       ownerId: store.ownerId.toString(),
       storeSlug: slug,
@@ -1623,31 +1680,33 @@ publicStoreRouter.post('/stores/:slug/orders/preview', resolveStore, requireAuth
       customerEmail: customer.email,
       customerPhone: parsed.data.customerPhone,
       customerLocation: parsed.data.customerLocation,
-      subtotal: quote.subtotal,
-      productDiscountTotal: quote.productDiscountTotal,
-      couponCode: quote.couponCode,
-      couponDiscountTotal: quote.couponDiscountTotal,
-      discountTotal: quote.discountTotal,
-      shippingFee: quote.shippingFee,
-      codFee: quote.codFee,
-      total: quote.total,
-      paymentMethod: quote.paymentMethod,
+      subtotal: effectiveQuote.subtotal,
+      productDiscountTotal: effectiveQuote.productDiscountTotal,
+      couponCode: effectiveQuote.couponCode,
+      couponDiscountTotal: effectiveQuote.couponDiscountTotal,
+      discountTotal: effectiveQuote.discountTotal,
+      shippingFee: effectiveQuote.shippingFee,
+      codFee: effectiveQuote.codFee,
+      total: effectiveQuote.total,
+      paymentMethod: effectiveQuote.paymentMethod,
       source: 'preview',
-      items: quote.items,
+      items: effectiveQuote.items,
     });
 
     return res.status(200).json({
       bill: {
-        subtotal: quote.subtotal,
-        productDiscountTotal: quote.productDiscountTotal,
-        couponCode: quote.couponCode,
-        couponDiscountTotal: quote.couponDiscountTotal,
-        discountTotal: quote.discountTotal,
-        shippingFee: quote.shippingFee,
-        codFee: quote.codFee,
-        paymentMethod: quote.paymentMethod,
-        total: quote.total,
+        subtotal: effectiveQuote.subtotal,
+        productDiscountTotal: effectiveQuote.productDiscountTotal,
+        couponCode: effectiveQuote.couponCode,
+        couponDiscountTotal: effectiveQuote.couponDiscountTotal,
+        discountTotal: effectiveQuote.discountTotal,
+        shippingFee: effectiveQuote.shippingFee,
+        codFee: effectiveQuote.codFee,
+        paymentMethod: effectiveQuote.paymentMethod,
+        total: effectiveQuote.total,
+        policy: normalizeCheckoutPolicy(policy),
       },
+      ...(requestedPaymentAdjusted ? { message: policy.reason } : {}),
     });
   } catch (error) {
     if (error instanceof CheckoutError) {
@@ -1703,6 +1762,19 @@ publicStoreRouter.post('/stores/:slug/orders', resolveStore, requireAuth, requir
       paymentMethod: parsed.data.paymentMethod,
       shippingRules,
     });
+
+    const policy = await evaluateCodTrustPolicy({
+      ownerId: store.ownerId.toString(),
+      customerId: customer._id.toString(),
+      orderTotal: quote.total,
+    });
+
+    if (!isPaymentMethodAllowed(policy, quote.paymentMethod)) {
+      return res.status(400).json({
+        message: policy.reason,
+        policy: normalizeCheckoutPolicy(policy),
+      });
+    }
 
     await StoreAnalyticsEventModel.create({
       ownerId: store.ownerId,
@@ -1865,6 +1937,7 @@ publicStoreRouter.post('/stores/:slug/orders', resolveStore, requireAuth, requir
           variantName?: string;
         }>,
       }),
+      policy: normalizeCheckoutPolicy(policy),
     });
   } catch (error) {
     if (error instanceof CheckoutError) {

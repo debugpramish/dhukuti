@@ -13,6 +13,7 @@ import {
 import { formatCurrency } from '@/features/storefront/utils';
 import type {
   CheckoutBill,
+  CheckoutPaymentMethod,
   CheckoutPayload,
   PaymentMethod,
   ShippingAddress,
@@ -101,6 +102,17 @@ export default function CheckoutPage() {
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const checkoutPolicy = previewBill?.policy;
+  const availablePaymentMethods = useMemo(() => {
+    if (!checkoutPolicy) {
+      return PAYMENT_METHODS;
+    }
+
+    const allowed = new Set<CheckoutPaymentMethod>(checkoutPolicy.allowedPaymentMethods);
+    const filtered = PAYMENT_METHODS.filter((method) => allowed.has(method.value as CheckoutPaymentMethod));
+    return filtered.length > 0 ? filtered : PAYMENT_METHODS;
+  }, [checkoutPolicy]);
+
   useEffect(() => {
     if (shippingMethods.length > 0) {
       setShippingMethod(shippingMethods[0]);
@@ -112,6 +124,14 @@ export default function CheckoutPage() {
     setPaymentSessionId('');
     setPaymentVerified(false);
   }, [couponCode, paymentMethod, shippingAddress, items]);
+
+  useEffect(() => {
+    if (availablePaymentMethods.some((method) => method.value === paymentMethod)) {
+      return;
+    }
+
+    setPaymentMethod(availablePaymentMethods[0]?.value ?? 'esewa');
+  }, [availablePaymentMethods, paymentMethod]);
 
   const buildCheckoutPayload = (): CheckoutPayload => ({
     items: items.map((item) => ({
@@ -177,11 +197,11 @@ export default function CheckoutPage() {
     setCurrentStep(1);
   };
 
-  const handleReviewSummary = async () => {
+  const handleReviewSummary = async (): Promise<boolean> => {
     if (!isAddressComplete(shippingAddress)) {
       pushToast({ variant: 'error', title: 'Shipping address required' });
       setCurrentStep(0);
-      return;
+      return false;
     }
 
     setIsReviewing(true);
@@ -189,17 +209,35 @@ export default function CheckoutPage() {
     try {
       const bill = await previewCheckoutBill(buildCheckoutPayload(), token);
       setPreviewBill(bill);
+
+      if (bill.paymentMethod !== paymentMethod) {
+        setPaymentMethod(bill.paymentMethod);
+        setPaymentSessionId('');
+        setPaymentVerified(false);
+      }
+
       pushToast({
         variant: 'success',
         title: 'Order summary updated',
         description: `Total ${formatCurrency(bill.total)}`,
       });
+
+      if (bill.policy?.reason) {
+        pushToast({
+          variant: 'info',
+          title: 'Checkout rule applied',
+          description: bill.policy.reason,
+        });
+      }
+
+      return true;
     } catch (error) {
       pushToast({
         variant: 'error',
         title: 'Unable to review order',
         description: error instanceof Error ? error.message : 'Please try again',
       });
+      return false;
     } finally {
       setIsReviewing(false);
     }
@@ -215,7 +253,10 @@ export default function CheckoutPage() {
     }
 
     if (!previewBill) {
-      await handleReviewSummary();
+      const reviewed = await handleReviewSummary();
+      if (!reviewed) {
+        return;
+      }
     }
 
     setIsVerifyingPayment(true);
@@ -261,7 +302,10 @@ export default function CheckoutPage() {
     }
 
     if (!previewBill) {
-      await handleReviewSummary();
+      const reviewed = await handleReviewSummary();
+      if (!reviewed) {
+        return;
+      }
       return;
     }
 
@@ -433,7 +477,7 @@ export default function CheckoutPage() {
 
           {currentStep === 2 ? (
             <div className="space-y-3">
-              {PAYMENT_METHODS.map((method) => (
+              {availablePaymentMethods.map((method) => (
                 <label key={method.value} className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 text-sm">
                   <input
                     type="radio"
@@ -444,6 +488,14 @@ export default function CheckoutPage() {
                   <span className="font-medium text-slate-900">{method.label}</span>
                 </label>
               ))}
+
+              {checkoutPolicy ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                  <p className="font-semibold uppercase tracking-wide">Smart Checkout Rule</p>
+                  <p className="mt-1">{checkoutPolicy.reason}</p>
+                  <p className="mt-1">Trust score: {checkoutPolicy.trustScore}/100</p>
+                </div>
+              ) : null}
 
               <label className="block space-y-1 text-sm">
                 <span className="font-medium text-slate-600">Coupon code (optional)</span>
@@ -459,7 +511,16 @@ export default function CheckoutPage() {
                 <Button type="button" variant="outline" onClick={() => setCurrentStep(1)}>
                   Back
                 </Button>
-                <Button type="button" onClick={() => setCurrentStep(3)}>
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    const reviewed = await handleReviewSummary();
+                    if (reviewed) {
+                      setCurrentStep(3);
+                    }
+                  }}
+                  disabled={isReviewing}
+                >
                   Continue to Summary
                 </Button>
               </div>
@@ -482,6 +543,9 @@ export default function CheckoutPage() {
                 <p className="font-medium text-slate-900">Shipping & Payment</p>
                 <p className="mt-1 text-slate-600">{shippingMethod.label} ({shippingMethod.eta})</p>
                 <p className="text-slate-600">Payment: {PAYMENT_METHODS.find((item) => item.value === paymentMethod)?.label}</p>
+                {checkoutPolicy ? (
+                  <p className="mt-1 text-xs text-slate-500">{checkoutPolicy.reason}</p>
+                ) : null}
                 {paymentMethod !== 'cod' ? (
                   <p className={`mt-1 text-xs ${paymentVerified ? 'text-emerald-700' : 'text-amber-700'}`}>
                     {paymentVerified

@@ -147,6 +147,18 @@ export type ShippingMethod = {
 };
 
 export type PaymentMethod = 'cod' | 'card' | 'paypal' | 'esewa' | 'khalti';
+export type CheckoutPaymentMethod = 'cod' | 'esewa' | 'khalti';
+
+export type CheckoutPolicy = {
+  trustScore: number;
+  riskBand: 'low' | 'medium' | 'high';
+  mode: 'cod_allowed' | 'partial_prepay' | 'prepaid_only';
+  allowedPaymentMethods: CheckoutPaymentMethod[];
+  codRequiresPrepay: boolean;
+  requiredPrepayRatio: number;
+  requiredPrepayAmount: number;
+  reason: string;
+};
 
 export type CheckoutPayload = {
   items: Array<{
@@ -234,6 +246,7 @@ export type CheckoutBill = {
   codFee: number;
   paymentMethod: 'cod' | 'esewa' | 'khalti';
   total: number;
+  policy?: CheckoutPolicy;
 };
 
 export type CmsPage = {

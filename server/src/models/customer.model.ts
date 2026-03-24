@@ -58,6 +58,12 @@ const customerSchema = new mongoose.Schema<CustomerDocument>(
 // Enforce uniqueness per store: same email can exist across stores but not within one store.
 customerSchema.index({ storeId: 1, email: 1 }, { unique: true });
 
+// Supports fast customer listing/pagination within a store.
+customerSchema.index({ storeId: 1, createdAt: -1, _id: -1 });
+
+// Supports case-insensitive prefix-style name filtering per store.
+customerSchema.index({ storeId: 1, name: 1, _id: 1 });
+
 const CustomerModel: Model<CustomerDocument> =
   (mongoose.models.Customer as Model<CustomerDocument> | undefined) ||
   mongoose.model<CustomerDocument>('Customer', customerSchema as Schema<CustomerDocument>);
