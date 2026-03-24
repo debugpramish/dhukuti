@@ -1,0 +1,290 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap');
+
+.maison-shell {
+    --mp-bg: #f5f1ea;
+    --mp-ink: #0f0a12;
+    --mp-ink-soft: #6e6771;
+    --mp-night: #0d0b10;
+    --mp-night-2: #161220;
+    --mp-gold: #b89247;
+    --mp-gold-soft: #dcc28f;
+    --mp-card: rgba(255, 255, 255, 0.62);
+    --mp-border: rgba(185, 146, 71, 0.24);
+    --mp-shadow: 0 24px 70px -44px rgba(11, 8, 16, 0.75);
+    font-family: 'Manrope', 'Segoe UI', sans-serif;
+    color: var(--mp-ink);
+}
+
+.maison-shell .mp-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 12% 20%, rgba(184, 146, 71, 0.2), transparent 40%),
+        radial-gradient(circle at 88% 0%, rgba(184, 146, 71, 0.14), transparent 36%),
+        linear-gradient(160deg, #f8f4ed 0%, #ece5da 100%);
+}
+
+.maison-shell .mp-hero {
+    position: relative;
+    overflow: hidden;
+    border-radius: 28px;
+    border: 1px solid var(--mp-border);
+    background: linear-gradient(160deg, var(--mp-night) 0%, var(--mp-night-2) 100%);
+    padding: clamp(1.5rem, 4.5vw, 4rem);
+    box-shadow: var(--mp-shadow);
+}
+
+.maison-shell .mp-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 84% 12%, rgba(184, 146, 71, 0.25), transparent 45%),
+        radial-gradient(circle at 8% 100%, rgba(184, 146, 71, 0.18), transparent 40%);
+    pointer-events: none;
+}
+
+.maison-shell .mp-hero-grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.4fr 0.9fr;
+    gap: clamp(1rem, 3vw, 2.75rem);
+}
+
+.maison-shell .mp-kicker {
+    margin-bottom: 1.15rem;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    font-size: 0.68rem;
+    color: var(--mp-gold-soft);
+}
+
+.maison-shell .mp-title {
+    margin: 0;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(2.35rem, 7vw, 5.1rem);
+    line-height: 0.95;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    color: #f4efe5;
+}
+
+.maison-shell .mp-sub {
+    margin-top: 1rem;
+    max-width: 36rem;
+    color: rgba(244, 239, 229, 0.72);
+    font-size: 0.95rem;
+}
+
+.maison-shell .mp-cta-row {
+    margin-top: 1.8rem;
+    display: flex;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+}
+
+.maison-shell .mp-btn {
+    border-radius: 999px;
+    padding: 0.72rem 1.3rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.maison-shell .mp-btn-main {
+    background: linear-gradient(145deg, #d1ad66, #9f7733);
+    color: #1b141f;
+    box-shadow: 0 14px 34px -18px rgba(184, 146, 71, 0.9);
+}
+
+.maison-shell .mp-btn-alt {
+    border: 1px solid rgba(244, 239, 229, 0.3);
+    color: #f4efe5;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.maison-shell .mp-btn:hover {
+    transform: translateY(-1px);
+}
+
+.maison-shell .mp-stat-panel {
+    border: 1px solid rgba(184, 146, 71, 0.25);
+    border-radius: 20px;
+    padding: 1rem;
+    background: rgba(24, 20, 31, 0.72);
+    backdrop-filter: blur(8px);
+}
+
+.maison-shell .mp-stat-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.8rem;
+}
+
+.maison-shell .mp-stat-value {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    color: #f4efe5;
+    font-size: 2rem;
+    line-height: 1;
+}
+
+.maison-shell .mp-stat-label {
+    color: rgba(244, 239, 229, 0.62);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+}
+
+.maison-shell .mp-section {
+    margin-top: 2.25rem;
+}
+
+.maison-shell .mp-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+    margin-bottom: 1rem;
+}
+
+.maison-shell .mp-h {
+    margin: 0;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(1.75rem, 4.2vw, 2.8rem);
+    font-weight: 500;
+}
+
+.maison-shell .mp-link {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: #5b5360;
+}
+
+.maison-shell .mp-category-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.85rem;
+}
+
+.maison-shell .mp-category-card {
+    border-radius: 16px;
+    border: 1px solid rgba(184, 146, 71, 0.3);
+    padding: 0.95rem;
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.8), rgba(252, 248, 242, 0.7));
+}
+
+.maison-shell .mp-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.95rem;
+}
+
+.maison-shell .mp-product {
+    display: block;
+    border-radius: 18px;
+    overflow: hidden;
+    border: 1px solid rgba(184, 146, 71, 0.28);
+    background: var(--mp-card);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 16px 40px -35px rgba(18, 12, 22, 0.85);
+    transition: transform 0.28s ease, box-shadow 0.28s ease;
+}
+
+.maison-shell .mp-product:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 50px -30px rgba(18, 12, 22, 0.75);
+}
+
+.maison-shell .mp-product-figure {
+    aspect-ratio: 4 / 5;
+    overflow: hidden;
+    background: linear-gradient(150deg, #f4ecdf 0%, #e6dccd 100%);
+}
+
+.maison-shell .mp-product-figure img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.maison-shell .mp-product-body {
+    padding: 0.9rem;
+}
+
+.maison-shell .mp-product-category {
+    color: #70571d;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 0.62rem;
+}
+
+.maison-shell .mp-product-title {
+    margin: 0.2rem 0 0.45rem;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 1.15rem;
+    line-height: 1.2;
+    color: var(--mp-ink);
+}
+
+.maison-shell .mp-price {
+    color: #24132f;
+    font-weight: 700;
+    font-size: 0.92rem;
+}
+
+.maison-shell .mp-empty {
+    border: 1px dashed rgba(112, 103, 113, 0.35);
+    border-radius: 16px;
+    padding: 1.25rem;
+    color: var(--mp-ink-soft);
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.maison-shell .mp-fade {
+    opacity: 0;
+    transform: translateY(14px);
+    animation: mp-fade-up 0.65s ease forwards;
+}
+
+.maison-shell .mp-fade-delay-1 {
+    animation-delay: 0.1s;
+}
+
+.maison-shell .mp-fade-delay-2 {
+    animation-delay: 0.2s;
+}
+
+.maison-shell .mp-fade-delay-3 {
+    animation-delay: 0.3s;
+}
+
+@keyframes mp-fade-up {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 1024px) {
+    .maison-shell .mp-hero-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .maison-shell .mp-grid,
+    .maison-shell .mp-category-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 640px) {
+
+    .maison-shell .mp-grid,
+    .maison-shell .mp-category-grid {
+        grid-template-columns: 1fr;
+    }
+}

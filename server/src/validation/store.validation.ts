@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+const STORE_THEME_VALUES = ['classic', 'maison_premium'] as const;
+
 export const updateStoreSettingsSchema = z.object({
   slug: z
     .string()
@@ -13,6 +15,7 @@ export const updateStoreSettingsSchema = z.object({
   description: z.string().trim().min(10, 'Description must be at least 10 characters'),
   phone: z.string().trim().min(7, 'Please enter a valid phone number'),
   address: z.string().trim().min(5, 'Address must be at least 5 characters'),
+  activeTheme: z.enum(STORE_THEME_VALUES).optional(),
 });
 
 export type UpdateStoreSettingsInput = z.infer<typeof updateStoreSettingsSchema>;

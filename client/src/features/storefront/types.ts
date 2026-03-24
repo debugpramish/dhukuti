@@ -70,6 +70,12 @@ export type StorefrontStore = {
   phone: string;
   address: string;
   logoUrl?: string;
+  activeTheme: 'classic' | 'maison_premium';
+  premiumTheme: {
+    unlocked: boolean;
+    unlockedAt?: string;
+    paymentReference?: string;
+  };
   shippingRules?: {
     baseFee: number;
     freeShippingAbove: number;

@@ -3,6 +3,15 @@ import mongoose, { type Document, type Model, type Schema, type Types } from 'mo
 export const STORE_COURIER_VALUES = ['nepal-post', 'pathao', 'delivery-sathi'] as const;
 export type StoreCourier = (typeof STORE_COURIER_VALUES)[number];
 
+export const STORE_THEME_VALUES = ['classic', 'maison_premium'] as const;
+export type StoreTheme = (typeof STORE_THEME_VALUES)[number];
+
+export interface StorePremiumThemeState {
+  unlocked: boolean;
+  unlockedAt?: Date;
+  paymentReference?: string;
+}
+
 export interface StoreShippingRules {
   baseFee: number;
   freeShippingAbove: number;
@@ -22,6 +31,8 @@ export interface StoreDocument extends Document {
   phone: string;
   address: string;
   logoUrl?: string;
+  activeTheme: StoreTheme;
+  premiumTheme: StorePremiumThemeState;
   shippingRules: StoreShippingRules;
   createdAt: Date;
   updatedAt: Date;
@@ -86,6 +97,36 @@ const storeSchema = new mongoose.Schema<StoreDocument>(
       type: String,
       trim: true,
       default: '',
+    },
+    activeTheme: {
+      type: String,
+      enum: STORE_THEME_VALUES,
+      default: 'classic',
+      index: true,
+    },
+    premiumTheme: {
+      type: new mongoose.Schema<StorePremiumThemeState>(
+        {
+          unlocked: {
+            type: Boolean,
+            default: false,
+          },
+          unlockedAt: {
+            type: Date,
+          },
+          paymentReference: {
+            type: String,
+            trim: true,
+            maxlength: 120,
+          },
+        },
+        {
+          _id: false,
+        },
+      ),
+      default: () => ({
+        unlocked: false,
+      }),
     },
     shippingRules: {
       type: new mongoose.Schema<StoreShippingRules>(

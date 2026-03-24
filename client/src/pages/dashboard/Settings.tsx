@@ -10,8 +10,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { setThemePreviewOverride } from '@/lib/storefront-theme';
 import { buildStorefrontUrl, getStorefrontRootDomain } from '@/lib/storefront-url';
-import { getStoreSettings, updateStoreSettings, uploadStoreLogo } from '@/services/api/storeApi';
+import {
+  getStoreSettings,
+  initiatePremiumThemePayment,
+  updateStoreSettings,
+  uploadStoreLogo,
+  verifyAndActivatePremiumTheme,
+} from '@/services/api/storeApi';
 
 const settingsSchema = z.object({
   slug: z
@@ -25,6 +32,7 @@ const settingsSchema = z.object({
   description: z.string().min(10, 'Store description must be at least 10 characters long.'),
   phone: z.string().min(7, 'Phone number is too short.'),
   address: z.string().min(5, 'Address must be at least 5 characters long.'),
+  activeTheme: z.enum(['classic', 'maison_premium']),
 });
 
 type SettingsFormValues = z.infer<typeof settingsSchema>;
@@ -36,6 +44,7 @@ export default function SettingsPage() {
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
   const [logoFileName, setLogoFileName] = useState<string>('');
   const [lastSavedSlug, setLastSavedSlug] = useState<string>('');
+  const [themeActionState, setThemeActionState] = useState<string | null>(null);
   const hasHydratedFormRef = useRef(false);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -53,6 +62,15 @@ export default function SettingsPage() {
       await queryClient.invalidateQueries({ queryKey: ['store-settings'] });
     },
   });
+  const initiatePremiumThemePaymentMutation = useMutation({
+    mutationFn: initiatePremiumThemePayment,
+  });
+  const verifyAndActivatePremiumThemeMutation = useMutation({
+    mutationFn: verifyAndActivatePremiumTheme,
+    onSuccess: (result) => {
+      queryClient.setQueryData(['store-settings'], result.store);
+    },
+  });
 
   const {
     register,
@@ -68,6 +86,7 @@ export default function SettingsPage() {
       description: '',
       phone: '',
       address: '',
+      activeTheme: 'classic',
     },
   });
 
@@ -84,6 +103,7 @@ export default function SettingsPage() {
         description: data.description,
         phone: data.phone,
         address: data.address,
+        activeTheme: data.activeTheme,
       });
       hasHydratedFormRef.current = true;
     }
@@ -106,6 +126,9 @@ export default function SettingsPage() {
   const savedPublicStoreUrl = savedSlug ? buildStorefrontUrl(savedSlug, '/') : '';
   const hasUnsavedSlugChange = Boolean(draftSlug && savedSlug && draftSlug !== savedSlug);
   const isSlugLocked = Boolean(data?.requiresSlugChangePayment);
+  const selectedTheme = watch('activeTheme');
+  const isPremiumThemeSelected = selectedTheme === 'maison_premium';
+  const isPremiumThemeUnlocked = Boolean(data?.premiumTheme?.unlocked);
   const rootDomain = typeof window !== 'undefined' ? getStorefrontRootDomain(window.location.hostname) : '';
 
   const onSubmit = handleSubmit(async (values) => {
@@ -132,6 +155,7 @@ export default function SettingsPage() {
         description: result.description,
         phone: result.phone,
         address: result.address,
+        activeTheme: result.activeTheme,
       });
 
       const latestSettings = await getStoreSettings();
@@ -157,6 +181,46 @@ export default function SettingsPage() {
       setFormSuccess('Store logo updated successfully.');
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : 'Unable to upload store logo.';
+      setFormError(message);
+    }
+  };
+
+  const handlePremiumThemePreview = () => {
+    const previewSlug = savedSlug || draftSlug;
+    if (!previewSlug) {
+      setFormError('Save your storefront slug first before opening premium preview.');
+      return;
+    }
+
+    setThemePreviewOverride(previewSlug, 'maison_premium');
+    const previewUrl = `${buildStorefrontUrl(previewSlug, '/storefront')}?themePreview=maison_premium`;
+    window.open(previewUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handlePremiumThemePurchase = async () => {
+    setFormError(null);
+    setThemeActionState('Initiating secure payment for premium theme...');
+
+    try {
+      const initiated = await initiatePremiumThemePaymentMutation.mutateAsync('khalti');
+      setThemeActionState('Payment initiated. Verifying transaction and activating theme...');
+      const activated = await verifyAndActivatePremiumThemeMutation.mutateAsync(initiated.paymentSessionId);
+
+      setLastSavedSlug(String(activated.store.slug || '').trim().toLowerCase());
+      reset({
+        slug: activated.store.slug,
+        name: activated.store.name,
+        description: activated.store.description,
+        phone: activated.store.phone,
+        address: activated.store.address,
+        activeTheme: activated.store.activeTheme,
+      });
+
+      setThemeActionState(null);
+      setFormSuccess('Premium theme unlocked and activated successfully.');
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : 'Unable to complete premium payment.';
+      setThemeActionState(null);
       setFormError(message);
     }
   };
@@ -251,6 +315,68 @@ export default function SettingsPage() {
                 <Label htmlFor="store-address">Address</Label>
                 <Textarea id="store-address" rows={3} {...register('address')} />
                 {errors.address ? <p className="text-xs text-destructive">{errors.address.message}</p> : null}
+              </div>
+
+              <div className="space-y-3 rounded-lg border p-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Storefront Theme</p>
+                  <p className="text-xs text-muted-foreground">
+                    Merchants can preview premium anytime, but activation requires payment.
+                  </p>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3">
+                    <input type="radio" value="classic" {...register('activeTheme')} className="mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Classic (Free)</p>
+                      <p className="text-xs text-muted-foreground">Current storefront style and layout.</p>
+                    </div>
+                  </label>
+
+                  <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3">
+                    <input type="radio" value="maison_premium" {...register('activeTheme')} className="mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Maison Premium</p>
+                      <p className="text-xs text-muted-foreground">
+                        Editorial luxury layout with animated premium visuals and live product sections.
+                      </p>
+                      <p className="mt-1 text-xs font-medium text-amber-700">
+                        Price: NPR {data?.premiumTheme?.priceNpr ?? 4999}
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" variant="outline" onClick={handlePremiumThemePreview}>
+                    Preview Premium Theme
+                  </Button>
+                  {!isPremiumThemeUnlocked ? (
+                    <Button
+                      type="button"
+                      onClick={() => void handlePremiumThemePurchase()}
+                      disabled={
+                        initiatePremiumThemePaymentMutation.isPending ||
+                        verifyAndActivatePremiumThemeMutation.isPending
+                      }
+                    >
+                      {initiatePremiumThemePaymentMutation.isPending || verifyAndActivatePremiumThemeMutation.isPending
+                        ? 'Processing Payment...'
+                        : `Pay NPR ${data?.premiumTheme?.priceNpr ?? 4999} & Activate`}
+                    </Button>
+                  ) : (
+                    <p className="text-xs font-medium text-emerald-700">Premium theme already unlocked.</p>
+                  )}
+                </div>
+
+                {isPremiumThemeSelected && !isPremiumThemeUnlocked ? (
+                  <p className="text-xs text-amber-700">
+                    Premium is selected but not yet unlocked. Use Pay & Activate to make it live for customers.
+                  </p>
+                ) : null}
+
+                {themeActionState ? <p className="text-xs text-muted-foreground">{themeActionState}</p> : null}
               </div>
 
               {publicStoreUrl ? (

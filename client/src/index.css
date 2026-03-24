@@ -95,6 +95,30 @@
     color: #0f172a;
   }
 
+  .storefront-shell-premium {
+    color: #f2ede4;
+    background:
+      radial-gradient(900px 420px at 0% -10%, rgba(184, 146, 71, 0.2), transparent 50%),
+      radial-gradient(820px 360px at 100% 0%, rgba(184, 146, 71, 0.15), transparent 45%),
+      linear-gradient(180deg, #100d14 0%, #1a1621 100%);
+  }
+
+  .storefront-shell-premium .storefront-main {
+    max-width: 90rem;
+  }
+
+  .storefront-shell-premium .storefront-orb-one {
+    background: rgba(184, 146, 71, 0.32);
+  }
+
+  .storefront-shell-premium .storefront-orb-two {
+    background: rgba(122, 92, 35, 0.26);
+  }
+
+  .storefront-shell-premium .storefront-orb-three {
+    background: rgba(232, 205, 142, 0.2);
+  }
+
   .storefront-main {
     position: relative;
     z-index: 10;

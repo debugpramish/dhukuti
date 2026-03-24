@@ -101,6 +101,16 @@ function normalizeStore(payload: unknown): StorefrontStore | null {
     phone: normalizeString(raw.phone),
     address: normalizeString(raw.address),
     logoUrl: normalizeString(raw.logoUrl) || undefined,
+    activeTheme: normalizeString(raw.activeTheme).toLowerCase() === 'maison_premium' ? 'maison_premium' : 'classic',
+    premiumTheme: isRecord(raw.premiumTheme)
+      ? {
+        unlocked: normalizeBoolean(raw.premiumTheme.unlocked, false),
+        unlockedAt: normalizeString(raw.premiumTheme.unlockedAt) || undefined,
+        paymentReference: normalizeString(raw.premiumTheme.paymentReference) || undefined,
+      }
+      : {
+        unlocked: false,
+      },
     shippingRules: isRecord(raw.shippingRules)
       ? {
         baseFee: Math.max(0, normalizeNumber(raw.shippingRules.baseFee, 100)),

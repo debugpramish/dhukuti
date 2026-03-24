@@ -49,6 +49,13 @@ function normalizeStore(payload: StorePayload): PublicStore {
     phone: store.phone || '',
     address: store.address || '',
     logoUrl: normalizeAssetUrl(store.logoUrl, API_BASE_URL),
+    activeTheme: store.activeTheme === 'maison_premium' ? 'maison_premium' : 'classic',
+    premiumTheme: {
+      unlocked: Boolean(store.premiumTheme?.unlocked),
+      unlockedAt: store.premiumTheme?.unlockedAt,
+      paymentReference: store.premiumTheme?.paymentReference,
+      priceNpr: Math.max(0, Number(store.premiumTheme?.priceNpr ?? 4999)),
+    },
     shippingRules: normalizeShippingRules(store.shippingRules),
   };
 }

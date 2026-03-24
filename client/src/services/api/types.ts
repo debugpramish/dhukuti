@@ -468,10 +468,26 @@ export type StoreSettings = {
   phone: string;
   address: string;
   logoUrl?: string;
+  activeTheme: 'classic' | 'maison_premium';
+  premiumTheme: {
+    unlocked: boolean;
+    unlockedAt?: string;
+    paymentReference?: string;
+    priceNpr: number;
+  };
   shippingRules: ShippingRules;
 };
 
-export type StoreSettingsUpdateInput = Pick<StoreSettings, 'slug' | 'name' | 'description' | 'phone' | 'address'>;
+export type StoreSettingsUpdateInput = Pick<StoreSettings, 'slug' | 'name' | 'description' | 'phone' | 'address' | 'activeTheme'>;
+
+export type PremiumThemePaymentSession = {
+  provider: 'esewa' | 'khalti';
+  paymentSessionId: string;
+  status: 'initiated' | 'verified';
+  amount: number;
+  expiresAt?: string;
+  paymentReference?: string;
+};
 
 export type PublicStore = Omit<StoreSettings, 'slugChangeCount' | 'paidSlugChangeCredits' | 'requiresSlugChangePayment'>;
 

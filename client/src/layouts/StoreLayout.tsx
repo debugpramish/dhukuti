@@ -2,11 +2,12 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useOutlet } from 'react-router-dom';
 
 import StoreCartDrawer from '@/components/store/StoreCartDrawer';
-import StoreFooter from '@/components/store/StoreFooter';
-import StoreNavbar from '@/components/store/StoreNavbar';
 import StoreToaster from '@/components/common/StoreToaster';
 import { fetchStorefrontStore } from '@/features/storefront/api/storefrontApi';
-import HomePage from '@/pages/storefront/HomePage';
+import { resolveStorefrontTheme } from '@/lib/storefront-theme';
+import ThemeAwareHomePage from '@/themes/ThemeAwareHomePage';
+import { ThemeAwareStoreFooter, ThemeAwareStoreNavbar } from '@/themes/ThemeAwareStoreChrome';
+import '@/themes/maison-premium/PremiumStorefront.css';
 
 const storefrontName = import.meta.env.VITE_STOREFRONT_NAME || 'Dhukuti Store';
 
@@ -49,21 +50,19 @@ export default function StoreLayout() {
   }
 
   const resolvedStoreName = store.name || storefrontName;
+  const storefrontTheme = resolveStorefrontTheme(store);
+  const isPremiumTheme = storefrontTheme === 'maison_premium';
 
   return (
-    <div className="storefront-shell">
+    <div className={`storefront-shell ${isPremiumTheme ? 'storefront-shell-premium' : ''}`}>
       <div className="storefront-orb storefront-orb-one" aria-hidden />
       <div className="storefront-orb storefront-orb-two" aria-hidden />
       <div className="storefront-orb storefront-orb-three" aria-hidden />
-      <StoreNavbar storeName={resolvedStoreName} logoUrl={store.logoUrl} />
+      <ThemeAwareStoreNavbar store={store} storeName={resolvedStoreName} />
       <main className="storefront-main sm:px-6 lg:px-8">
-        {outlet ?? <HomePage />}
+        {outlet ?? <ThemeAwareHomePage />}
       </main>
-      <StoreFooter
-        storeName={resolvedStoreName}
-        address={store.address}
-        phone={store.phone}
-      />
+      <ThemeAwareStoreFooter store={store} storeName={resolvedStoreName} />
       <StoreCartDrawer storeName={resolvedStoreName} />
       <StoreToaster />
     </div>

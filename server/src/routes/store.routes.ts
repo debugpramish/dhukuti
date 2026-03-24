@@ -2,7 +2,12 @@ import express from 'express';
 import fs from 'fs';
 import multer from 'multer';
 import path from 'path';
-import StoreModel, { STORE_COURIER_VALUES, type StoreShippingRules } from '../models/store.model';
+import StoreModel, {
+  STORE_COURIER_VALUES,
+  STORE_THEME_VALUES,
+  type StoreShippingRules,
+  type StoreTheme,
+} from '../models/store.model';
 import { requireAuth, requireMerchant } from '../middleware/auth.middleware';
 import { getStoreLogoPublicId, uploadImageBuffer } from '../services/cloudinary.service';
 import { ensureMerchantStore } from '../services/merchant-data.service';
@@ -10,6 +15,24 @@ import { updateStoreSettingsSchema } from '../validation/store.validation';
 
 const storeRouter = express.Router();
 const storeLogoUploadsDirectory = path.resolve(process.cwd(), 'uploads/store-logos');
+const PREMIUM_THEME_PRICE_NPR = 4999;
+const PREMIUM_THEME_PAYMENT_TTL_MS = 15 * 60 * 1000;
+
+type PremiumThemePaymentProvider = 'esewa' | 'khalti';
+
+type PremiumThemePaymentSession = {
+  id: string;
+  userId: string;
+  storeId: string;
+  provider: PremiumThemePaymentProvider;
+  amount: number;
+  status: 'initiated' | 'verified';
+  paymentReference?: string;
+  createdAt: number;
+  expiresAt: number;
+};
+
+const premiumThemePaymentSessions = new Map<string, PremiumThemePaymentSession>();
 
 const storeLogoUpload = multer({
   storage: multer.memoryStorage(),
@@ -72,6 +95,12 @@ function toStoreResponse(store: {
   phone: string;
   address: string;
   logoUrl?: string;
+  activeTheme?: StoreTheme;
+  premiumTheme?: {
+    unlocked?: boolean;
+    unlockedAt?: Date;
+    paymentReference?: string;
+  };
   shippingRules?: StoreShippingRules;
 }) {
   const normalizedShippingRules = {
@@ -96,8 +125,43 @@ function toStoreResponse(store: {
     phone: store.phone,
     address: store.address,
     logoUrl: store.logoUrl,
+    activeTheme: STORE_THEME_VALUES.includes((store.activeTheme || 'classic') as StoreTheme)
+      ? (store.activeTheme as StoreTheme)
+      : 'classic',
+    premiumTheme: {
+      unlocked: Boolean(store.premiumTheme?.unlocked),
+      unlockedAt: store.premiumTheme?.unlockedAt || undefined,
+      paymentReference: store.premiumTheme?.paymentReference || undefined,
+      priceNpr: PREMIUM_THEME_PRICE_NPR,
+    },
     shippingRules: normalizedShippingRules,
   };
+}
+
+function normalizePremiumProvider(value: unknown): PremiumThemePaymentProvider | null {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'esewa' || normalized === 'khalti') {
+    return normalized;
+  }
+
+  return null;
+}
+
+function cleanupExpiredPremiumThemePaymentSessions() {
+  const now = Date.now();
+  for (const [sessionId, session] of premiumThemePaymentSessions.entries()) {
+    if (session.expiresAt <= now) {
+      premiumThemePaymentSessions.delete(sessionId);
+    }
+  }
+}
+
+function buildPremiumThemePaymentSessionId(provider: PremiumThemePaymentProvider): string {
+  return `${provider.toUpperCase()}-THM-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+}
+
+function buildPremiumThemePaymentReference(provider: PremiumThemePaymentProvider): string {
+  return `${provider.toUpperCase()}-THEME-${Date.now().toString(36).toUpperCase()}`;
 }
 
 storeRouter.get('/settings', requireAuth, requireMerchant, async (req, res) => {
@@ -114,11 +178,15 @@ storeRouter.get('/settings', requireAuth, requireMerchant, async (req, res) => {
     return res.status(200).json({
       store: toStoreResponse({
         slug: store.slug,
+        slugChangeCount: store.slugChangeCount,
+        paidSlugChangeCredits: store.paidSlugChangeCredits,
         name: store.name,
         description: store.description,
         phone: store.phone,
         address: store.address,
         logoUrl: store.logoUrl,
+        activeTheme: store.activeTheme,
+        premiumTheme: store.premiumTheme,
         shippingRules: store.shippingRules,
       }),
     });
@@ -145,10 +213,18 @@ storeRouter.put('/settings', requireAuth, requireMerchant, async (req, res) => {
     const store = await ensureMerchantStore(req.userId);
 
     const hasSlugInPayload = Object.prototype.hasOwnProperty.call(parsed.data, 'slug');
+    const hasActiveThemeInPayload = Object.prototype.hasOwnProperty.call(parsed.data, 'activeTheme');
     const nextSlug = hasSlugInPayload && typeof parsed.data.slug === 'string'
       ? parsed.data.slug.trim().toLowerCase()
       : store.slug;
+    const nextActiveTheme = hasActiveThemeInPayload
+      ? parsed.data.activeTheme || 'classic'
+      : store.activeTheme || 'classic';
     const isSlugChangeRequested = hasSlugInPayload && nextSlug !== store.slug;
+    const isPremiumThemeActivationRequested = hasActiveThemeInPayload
+      && nextActiveTheme === 'maison_premium'
+      && (store.activeTheme || 'classic') !== 'maison_premium';
+    const isPremiumThemeUnlocked = Boolean(store.premiumTheme?.unlocked);
     const slugChangeCount = Math.max(0, Number(store.slugChangeCount ?? 0));
     const paidSlugChangeCredits = Math.max(0, Number(store.paidSlugChangeCredits ?? 0));
     const hasFreeSlugChangeRemaining = slugChangeCount < 1;
@@ -158,6 +234,12 @@ storeRouter.put('/settings', requireAuth, requireMerchant, async (req, res) => {
     if (isSlugChangeRequested && !canChangeSlug) {
       return res.status(402).json({
         message: 'You have already used your free storefront URL change. Additional URL changes require payment.',
+      });
+    }
+
+    if (isPremiumThemeActivationRequested && !isPremiumThemeUnlocked) {
+      return res.status(402).json({
+        message: 'Premium theme activation requires payment. Complete the premium checkout first.',
       });
     }
 
@@ -174,6 +256,7 @@ storeRouter.put('/settings', requireAuth, requireMerchant, async (req, res) => {
     } = {
       $set: {
         ...(hasSlugInPayload ? { slug: nextSlug } : {}),
+        ...(hasActiveThemeInPayload ? { activeTheme: nextActiveTheme } : {}),
         name: parsed.data.name,
         description: parsed.data.description,
         phone: parsed.data.phone,
@@ -205,11 +288,15 @@ storeRouter.put('/settings', requireAuth, requireMerchant, async (req, res) => {
     return res.status(200).json({
       store: toStoreResponse({
         slug: updatedStore.slug,
+        slugChangeCount: updatedStore.slugChangeCount,
+        paidSlugChangeCredits: updatedStore.paidSlugChangeCredits,
         name: updatedStore.name,
         description: updatedStore.description,
         phone: updatedStore.phone,
         address: updatedStore.address,
         logoUrl: updatedStore.logoUrl,
+        activeTheme: updatedStore.activeTheme,
+        premiumTheme: updatedStore.premiumTheme,
         shippingRules: updatedStore.shippingRules,
       }),
     });
@@ -265,11 +352,15 @@ storeRouter.put('/settings/logo', requireAuth, requireMerchant, (req, res) => {
       return res.status(200).json({
         store: toStoreResponse({
           slug: store.slug,
+          slugChangeCount: store.slugChangeCount,
+          paidSlugChangeCredits: store.paidSlugChangeCredits,
           name: store.name,
           description: store.description,
           phone: store.phone,
           address: store.address,
           logoUrl: store.logoUrl,
+          activeTheme: store.activeTheme,
+          premiumTheme: store.premiumTheme,
           shippingRules: store.shippingRules,
         }),
       });
@@ -278,6 +369,123 @@ storeRouter.put('/settings/logo', requireAuth, requireMerchant, (req, res) => {
       return res.status(500).json({ message: 'Unable to upload store logo' });
     }
   });
+});
+
+storeRouter.post('/themes/maison-premium/initiate', requireAuth, requireMerchant, async (req, res) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const provider = normalizePremiumProvider(req.body?.provider);
+    if (!provider) {
+      return res.status(400).json({ message: 'Unsupported payment provider. Use eSewa or Khalti.' });
+    }
+
+    const store = await ensureMerchantStore(req.userId);
+
+    if (store.premiumTheme?.unlocked) {
+      return res.status(409).json({ message: 'Premium theme is already unlocked for this store.' });
+    }
+
+    cleanupExpiredPremiumThemePaymentSessions();
+
+    const now = Date.now();
+    const paymentSession: PremiumThemePaymentSession = {
+      id: buildPremiumThemePaymentSessionId(provider),
+      userId: req.userId,
+      storeId: store._id.toString(),
+      provider,
+      amount: PREMIUM_THEME_PRICE_NPR,
+      status: 'initiated',
+      createdAt: now,
+      expiresAt: now + PREMIUM_THEME_PAYMENT_TTL_MS,
+    };
+
+    premiumThemePaymentSessions.set(paymentSession.id, paymentSession);
+
+    return res.status(200).json({
+      payment: {
+        provider,
+        paymentSessionId: paymentSession.id,
+        status: paymentSession.status,
+        amount: paymentSession.amount,
+        expiresAt: new Date(paymentSession.expiresAt).toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error('Initiate premium theme payment error:', error);
+    return res.status(500).json({ message: 'Unable to initiate premium theme payment' });
+  }
+});
+
+storeRouter.post('/themes/maison-premium/verify-and-activate', requireAuth, requireMerchant, async (req, res) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const paymentSessionId = String(req.body?.paymentSessionId || '').trim();
+    if (!paymentSessionId) {
+      return res.status(400).json({ message: 'paymentSessionId is required' });
+    }
+
+    cleanupExpiredPremiumThemePaymentSessions();
+    const session = premiumThemePaymentSessions.get(paymentSessionId);
+
+    if (!session || session.userId !== req.userId) {
+      return res.status(404).json({ message: 'Payment session not found or expired' });
+    }
+
+    if (session.expiresAt <= Date.now()) {
+      premiumThemePaymentSessions.delete(paymentSessionId);
+      return res.status(410).json({ message: 'Payment session expired. Please initiate again.' });
+    }
+
+    const store = await ensureMerchantStore(req.userId);
+    if (store._id.toString() !== session.storeId) {
+      return res.status(409).json({ message: 'Payment session does not match the active store' });
+    }
+
+    const paymentReference = buildPremiumThemePaymentReference(session.provider);
+    session.status = 'verified';
+    session.paymentReference = paymentReference;
+    premiumThemePaymentSessions.set(paymentSessionId, session);
+
+    store.premiumTheme = {
+      unlocked: true,
+      unlockedAt: new Date(),
+      paymentReference,
+    };
+    store.activeTheme = 'maison_premium';
+    await store.save();
+
+    return res.status(200).json({
+      payment: {
+        provider: session.provider,
+        paymentSessionId: session.id,
+        status: session.status,
+        amount: session.amount,
+        paymentReference,
+      },
+      store: toStoreResponse({
+        slug: store.slug,
+        slugChangeCount: store.slugChangeCount,
+        paidSlugChangeCredits: store.paidSlugChangeCredits,
+        name: store.name,
+        description: store.description,
+        phone: store.phone,
+        address: store.address,
+        logoUrl: store.logoUrl,
+        activeTheme: store.activeTheme,
+        premiumTheme: store.premiumTheme,
+        shippingRules: store.shippingRules,
+      }),
+    });
+  } catch (error) {
+    console.error('Verify premium theme payment error:', error);
+    return res.status(500).json({ message: 'Unable to verify premium theme payment' });
+  }
 });
 
 export default storeRouter;

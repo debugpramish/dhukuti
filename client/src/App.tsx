@@ -7,7 +7,7 @@ import DashboardLayout from '@/layouts/DashboardLayout';
 import StoreLayout from '@/layouts/StoreLayout';
 import { getAuthToken } from '@/lib/auth';
 import { getStoreSlugFromLocation } from '@/lib/storefront-url';
-import HomePage from '@/pages/storefront/HomePage';
+import ThemeAwareHomePage from '@/pages/thems/ThemeAwareHomePage';
 
 const OverviewPage = lazy(() => import('@/pages/dashboard/Overview'));
 const OrdersPage = lazy(() => import('@/pages/dashboard/Orders'));
@@ -26,20 +26,20 @@ const MarketingLandingPage = lazy(() => import('@/pages/marketing/LandingPage'))
 const MerchantLoginPage = lazy(() => import('@/pages/dashboard/auth/LoginPage'));
 const MerchantSignupPage = lazy(() => import('@/pages/dashboard/auth/SignupPage'));
 
-const ShopPage = lazy(() => import('@/pages/storefront/ShopPage'));
-const ProductPage = lazy(() => import('@/pages/storefront/ProductPage'));
-const CartPage = lazy(() => import('@/pages/storefront/CartPage'));
-const CheckoutPage = lazy(() => import('@/pages/storefront/CheckoutPage'));
-const CustomerLoginPage = lazy(() => import('@/pages/storefront/LoginPage'));
-const CustomerRegisterPage = lazy(() => import('@/pages/storefront/RegisterPage'));
-const AccountPage = lazy(() => import('@/pages/storefront/AccountPage'));
-const AccountOrdersPage = lazy(() => import('@/pages/storefront/AccountOrdersPage'));
-const OrderConfirmationPage = lazy(() => import('@/pages/storefront/OrderConfirmationPage'));
-const SearchPage = lazy(() => import('@/pages/storefront/SearchPage'));
-const WishlistPage = lazy(() => import('@/pages/storefront/WishlistPage'));
-const CmsPage = lazy(() => import('@/pages/storefront/CmsPage'));
-const ContactPage = lazy(() => import('@/pages/storefront/ContactPage'));
-const NotFoundPage = lazy(() => import('@/pages/storefront/NotFoundPage'));
+const ThemeAwareShopPage = lazy(() => import('@/pages/thems/ThemeAwareShopPage'));
+const ThemeAwareProductPage = lazy(() => import('@/pages/thems/ThemeAwareProductPage'));
+const ThemeAwareCartPage = lazy(() => import('@/pages/thems/ThemeAwareCartPage'));
+const ThemeAwareCheckoutPage = lazy(() => import('@/pages/thems/ThemeAwareCheckoutPage'));
+const ThemeAwareLoginPage = lazy(() => import('@/pages/thems/ThemeAwareLoginPage'));
+const ThemeAwareRegisterPage = lazy(() => import('@/pages/thems/ThemeAwareRegisterPage'));
+const ThemeAwareAccountPage = lazy(() => import('@/pages/thems/ThemeAwareAccountPage'));
+const ThemeAwareAccountOrdersPage = lazy(() => import('@/pages/thems/ThemeAwareAccountOrdersPage'));
+const ThemeAwareOrderConfirmationPage = lazy(() => import('@/pages/thems/ThemeAwareOrderConfirmationPage'));
+const ThemeAwareSearchPage = lazy(() => import('@/pages/thems/ThemeAwareSearchPage'));
+const ThemeAwareWishlistPage = lazy(() => import('@/pages/thems/ThemeAwareWishlistPage'));
+const ThemeAwareCmsPage = lazy(() => import('@/pages/thems/ThemeAwareCmsPage'));
+const ThemeAwareContactPage = lazy(() => import('@/pages/thems/ThemeAwareContactPage'));
+const ThemeAwareNotFoundPage = lazy(() => import('@/pages/thems/ThemeAwareNotFoundPage'));
 
 function ProtectedDashboardRoute({ children }: { children: ReactNode }) {
   if (!getAuthToken()) {
@@ -124,22 +124,22 @@ export default function App() {
               <Route index element={<RootEntry />} />
 
               <Route path="/" element={<StoreLayout />}>
-                <Route path="storefront" element={<HomePage />} />
-                <Route path="shop" element={<ShopPage />} />
-                <Route path="product/:slug" element={<ProductPage />} />
-                <Route path="cart" element={<CartPage />} />
-                <Route path="checkout" element={<CheckoutPage />} />
-                <Route path="login" element={<CustomerLoginPage />} />
-                <Route path="register" element={<CustomerRegisterPage />} />
+                <Route path="storefront" element={<ThemeAwareHomePage />} />
+                <Route path="shop" element={<ThemeAwareShopPage />} />
+                <Route path="product/:slug" element={<ThemeAwareProductPage />} />
+                <Route path="cart" element={<ThemeAwareCartPage />} />
+                <Route path="checkout" element={<ThemeAwareCheckoutPage />} />
+                <Route path="login" element={<ThemeAwareLoginPage />} />
+                <Route path="register" element={<ThemeAwareRegisterPage />} />
                 <Route path="signup" element={<Navigate to="/register" replace />} />
-                <Route path="account" element={<AccountPage />} />
-                <Route path="account/orders" element={<AccountOrdersPage />} />
-                <Route path="order-confirmation/:orderId" element={<OrderConfirmationPage />} />
-                <Route path="search" element={<SearchPage />} />
-                <Route path="wishlist" element={<WishlistPage />} />
-                <Route path="contact" element={<ContactPage />} />
-                <Route path="page/:slug" element={<CmsPage />} />
-                <Route path="*" element={<NotFoundPage />} />
+                <Route path="account" element={<ThemeAwareAccountPage />} />
+                <Route path="account/orders" element={<ThemeAwareAccountOrdersPage />} />
+                <Route path="order-confirmation/:orderId" element={<ThemeAwareOrderConfirmationPage />} />
+                <Route path="search" element={<ThemeAwareSearchPage />} />
+                <Route path="wishlist" element={<ThemeAwareWishlistPage />} />
+                <Route path="contact" element={<ThemeAwareContactPage />} />
+                <Route path="page/:slug" element={<ThemeAwareCmsPage />} />
+                <Route path="*" element={<ThemeAwareNotFoundPage />} />
               </Route>
 
               <Route path="/dashboard/login" element={<MerchantLoginPage />} />

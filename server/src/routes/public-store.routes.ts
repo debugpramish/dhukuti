@@ -27,6 +27,12 @@ function toStoreResponse(store: {
   phone: string;
   address: string;
   logoUrl?: string;
+  activeTheme?: string;
+  premiumTheme?: {
+    unlocked?: boolean;
+    unlockedAt?: Date;
+    paymentReference?: string;
+  };
   shippingRules?: {
     baseFee?: number;
     freeShippingAbove?: number;
@@ -55,6 +61,12 @@ function toStoreResponse(store: {
     phone: store.phone,
     address: store.address,
     logoUrl: store.logoUrl,
+    activeTheme: String(store.activeTheme || 'classic') === 'maison_premium' ? 'maison_premium' : 'classic',
+    premiumTheme: {
+      unlocked: Boolean(store.premiumTheme?.unlocked),
+      unlockedAt: store.premiumTheme?.unlockedAt || undefined,
+      paymentReference: store.premiumTheme?.paymentReference || undefined,
+    },
     shippingRules,
   };
 }
@@ -930,7 +942,7 @@ publicStoreRouter.get('/stores', async (req, res) => {
     const stores = await StoreModel.find({})
       .sort({ createdAt: -1 })
       .limit(limit)
-      .select({ slug: 1, name: 1, description: 1, phone: 1, address: 1, logoUrl: 1, shippingRules: 1 });
+      .select({ slug: 1, name: 1, description: 1, phone: 1, address: 1, logoUrl: 1, activeTheme: 1, premiumTheme: 1, shippingRules: 1 });
 
     return res.status(200).json({
       stores: stores.map((store) =>
@@ -941,6 +953,8 @@ publicStoreRouter.get('/stores', async (req, res) => {
           phone: store.phone,
           address: store.address,
           logoUrl: store.logoUrl,
+          activeTheme: store.activeTheme,
+          premiumTheme: store.premiumTheme,
           shippingRules: store.shippingRules,
         }),
       ),
@@ -971,6 +985,8 @@ publicStoreRouter.get('/stores/:slug', async (req, res) => {
         phone: store.phone,
         address: store.address,
         logoUrl: store.logoUrl,
+        activeTheme: store.activeTheme,
+        premiumTheme: store.premiumTheme,
         shippingRules: store.shippingRules,
       }),
     });

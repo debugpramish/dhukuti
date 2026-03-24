@@ -1,0 +1,183 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap');
+
+.storefront-shell-premium .premium-route {
+  --pp-gold: #c8a866;
+  --pp-gold-soft: #dfc898;
+  --pp-border: rgba(200, 168, 102, 0.26);
+  --pp-border-strong: rgba(223, 200, 152, 0.38);
+  --pp-ink: #f5ecdc;
+  --pp-muted: #bead8d;
+  --pp-surface: rgba(21, 16, 28, 0.92);
+  --pp-surface-soft: rgba(29, 22, 38, 0.84);
+  color: var(--pp-ink);
+}
+
+.storefront-shell-premium .premium-route .storefront-heading {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.storefront-shell-premium .premium-route .storefront-panel,
+.storefront-shell-premium .premium-route .storefront-surface {
+  border: 1px solid var(--pp-border);
+  border-radius: 1.25rem;
+  background: linear-gradient(160deg, var(--pp-surface-soft), var(--pp-surface));
+}
+
+.storefront-shell-premium .premium-route .storefront-panel p,
+.storefront-shell-premium .premium-route .storefront-surface p,
+.storefront-shell-premium .premium-route .storefront-panel span,
+.storefront-shell-premium .premium-route .storefront-surface span,
+.storefront-shell-premium .premium-route .storefront-panel label,
+.storefront-shell-premium .premium-route .storefront-surface label {
+  color: var(--pp-muted);
+}
+
+.storefront-shell-premium .premium-route > section:first-child.storefront-panel,
+.storefront-shell-premium .premium-route section.premium-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 2rem;
+  border-color: var(--pp-border-strong);
+  background: linear-gradient(140deg, rgba(18, 13, 25, 0.96), rgba(38, 30, 50, 0.9));
+  box-shadow: 0 36px 80px -54px rgba(0, 0, 0, 0.95);
+}
+
+.storefront-shell-premium .premium-route > section:first-child.storefront-panel::before,
+.storefront-shell-premium .premium-route section.premium-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 11% 10%, rgba(223, 200, 152, 0.2), transparent 42%),
+    radial-gradient(circle at 92% 3%, rgba(200, 168, 102, 0.18), transparent 45%);
+}
+
+.storefront-shell-premium .premium-route .storefront-input,
+.storefront-shell-premium .premium-route .storefront-select,
+.storefront-shell-premium .premium-route .storefront-textarea,
+.storefront-shell-premium .premium-route input,
+.storefront-shell-premium .premium-route select,
+.storefront-shell-premium .premium-route textarea {
+  border-color: var(--pp-border);
+  border-radius: 0.9rem;
+  background: rgba(16, 12, 23, 0.9);
+  color: var(--pp-ink);
+}
+
+.storefront-shell-premium .premium-route .storefront-input:focus,
+.storefront-shell-premium .premium-route .storefront-select:focus,
+.storefront-shell-premium .premium-route .storefront-textarea:focus,
+.storefront-shell-premium .premium-route input:focus,
+.storefront-shell-premium .premium-route select:focus,
+.storefront-shell-premium .premium-route textarea:focus {
+  border-color: var(--pp-gold);
+  box-shadow: 0 0 0 3px rgba(200, 168, 102, 0.16);
+}
+
+.storefront-shell-premium .premium-route button,
+.storefront-shell-premium .premium-route .inline-flex,
+.storefront-shell-premium .premium-route .storefront-chip {
+  border-radius: 999px;
+}
+
+.storefront-shell-premium .premium-route .bg-slate-900,
+.storefront-shell-premium .premium-route .hover\:bg-slate-800:hover {
+  background: linear-gradient(145deg, #d6b775, #9f7938);
+  color: #150f1c;
+  border-color: transparent;
+}
+
+.storefront-shell-premium .premium-route .border-slate-200,
+.storefront-shell-premium .premium-route .border-slate-200\/80,
+.storefront-shell-premium .premium-route .border-slate-200\/70,
+.storefront-shell-premium .premium-route .border-slate-200\/60,
+.storefront-shell-premium .premium-route .border-slate-200\/50,
+.storefront-shell-premium .premium-route .border-slate-200\/40 {
+  border-color: var(--pp-border);
+}
+
+.storefront-shell-premium .premium-route .text-slate-900,
+.storefront-shell-premium .premium-route .font-semibold,
+.storefront-shell-premium .premium-route .font-medium {
+  color: var(--pp-ink);
+}
+
+.storefront-shell-premium .premium-route .text-slate-800,
+.storefront-shell-premium .premium-route .text-slate-700,
+.storefront-shell-premium .premium-route .text-slate-600,
+.storefront-shell-premium .premium-route .text-slate-500 {
+  color: var(--pp-muted);
+}
+
+.storefront-shell-premium .premium-route-shop .grid.gap-6.lg\:grid-cols-\[280px_1fr\] {
+  align-items: flex-start;
+}
+
+.storefront-shell-premium .premium-route-shop aside.storefront-panel {
+  top: 6.5rem;
+}
+
+.storefront-shell-premium .premium-route-product .grid.gap-8.lg\:grid-cols-2 > div:first-child .storefront-panel {
+  border-radius: 1.5rem;
+  border-color: var(--pp-border-strong);
+}
+
+.storefront-shell-premium .premium-route-cart article.storefront-panel,
+.storefront-shell-premium .premium-route-wishlist article.storefront-panel,
+.storefront-shell-premium .premium-route-account article {
+  border-radius: 1.1rem;
+  border-color: var(--pp-border);
+  background: rgba(29, 22, 38, 0.8);
+}
+
+.storefront-shell-premium .premium-route-checkout ol li {
+  border: 1px solid var(--pp-border);
+  background: rgba(22, 16, 31, 0.82);
+  color: var(--pp-muted);
+}
+
+.storefront-shell-premium .premium-route-checkout ol li.bg-slate-900 {
+  background: linear-gradient(145deg, #d6b775, #9f7938);
+  color: #1a1322;
+}
+
+.storefront-shell-premium .premium-route-auth .storefront-panel,
+.storefront-shell-premium .premium-route-contact .storefront-panel,
+.storefront-shell-premium .premium-route-cms .storefront-panel {
+  border-radius: 1.5rem;
+}
+
+.storefront-shell-premium .premium-route-order .border-emerald-200 {
+  border-color: rgba(200, 168, 102, 0.42);
+}
+
+.storefront-shell-premium .premium-route-order .bg-emerald-50\/90 {
+  background: linear-gradient(140deg, rgba(21, 15, 29, 0.96), rgba(40, 30, 54, 0.88));
+}
+
+.storefront-shell-premium .premium-route-not-found {
+  margin-top: 4rem;
+}
+
+.storefront-shell-premium .premium-route-not-found .storefront-panel {
+  border-radius: 2rem;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(223, 200, 152, 0.16), transparent 45%),
+    linear-gradient(145deg, rgba(20, 15, 28, 0.95), rgba(34, 26, 44, 0.92));
+}
+
+.storefront-shell-premium .premium-route-search .grid.gap-2.sm\:grid-cols-2.lg\:grid-cols-4 a,
+.storefront-shell-premium .premium-route-search .grid.gap-4.sm\:grid-cols-2.xl\:grid-cols-3 > * {
+  border: 1px solid var(--pp-border);
+  border-radius: 1rem;
+  background: rgba(27, 21, 36, 0.84);
+}
+
+@media (max-width: 1023px) {
+  .storefront-shell-premium .premium-route > section:first-child.storefront-panel {
+    border-radius: 1.4rem;
+  }
+}
