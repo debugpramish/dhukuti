@@ -76,6 +76,7 @@ function normalizeProduct(product: Product): Product {
     discountedPrice,
     discountAmount,
     hasDiscount: Boolean(product.hasDiscount ?? discountAmount > 0),
+    paymentPolicy: product.paymentPolicy === 'PREPAID_ONLY' ? 'PREPAID_ONLY' : 'POSTPAID',
     isFeatured: Boolean(product.isFeatured),
     imageUrl: normalizeProductImageUrl(product.imageUrl, product.title, API_BASE_URL),
     variants: normalizeVariants(product.variants),

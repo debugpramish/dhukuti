@@ -1,4 +1,5 @@
 export type ProductAvailability = 'in_stock' | 'out_of_stock' | 'preorder';
+export type ProductPaymentPolicy = 'PREPAID_ONLY' | 'POSTPAID';
 
 export type ProductSort =
   | 'newest'
@@ -43,6 +44,7 @@ export type StorefrontProduct = {
   price: number;
   compareAtPrice?: number;
   discountPercent?: number;
+  paymentPolicy: ProductPaymentPolicy;
   thumbnail: string;
   images: string[];
   rating: ProductRating;
@@ -131,6 +133,7 @@ export type CartItem = {
   image: string;
   quantity: number;
   availability: ProductAvailability;
+  paymentPolicy: ProductPaymentPolicy;
   variantId?: string;
   variantLabel?: string;
 };
@@ -164,6 +167,7 @@ export type CheckoutPolicy = {
   requiredPrepayRatio: number;
   requiredPrepayAmount: number;
   reason: string;
+  prepaidOnlyInCart?: boolean;
 };
 
 export type CheckoutPayload = {

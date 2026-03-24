@@ -3,7 +3,7 @@ import fs from 'fs';
 import multer from 'multer';
 import mongoose from 'mongoose';
 import path from 'path';
-import ProductModel, { type ProductDiscountType } from '../models/product.model';
+import ProductModel, { type ProductDiscountType, type ProductPaymentPolicy } from '../models/product.model';
 import { requireAuth, requireMerchant } from '../middleware/auth.middleware';
 import { ensureMerchantDemoData } from '../services/merchant-data.service';
 import { destroyImageByPublicId, getProductImagePublicId, uploadImageBuffer } from '../services/cloudinary.service';
@@ -44,6 +44,7 @@ function toProductResponse(product: {
   discountValue: number;
   imageUrl: string;
   status: string;
+  paymentPolicy?: string;
   isFeatured: boolean;
   isTrending: boolean;
   isBestSeller: boolean;
@@ -57,6 +58,7 @@ function toProductResponse(product: {
   }>;
 }) {
   const discountType = normalizeDiscountType(product.discountType);
+  const paymentPolicy = normalizePaymentPolicy(product.paymentPolicy);
   const discountValue = Number(product.discountValue ?? 0);
   const discountedPrice = calculateDiscountedPrice(product.price, discountType, discountValue);
   const discountAmount = roundCurrency(Math.max(product.price - discountedPrice, 0));
@@ -73,6 +75,7 @@ function toProductResponse(product: {
     hasDiscount: discountAmount > 0,
     imageUrl: product.imageUrl,
     status: product.status,
+    paymentPolicy,
     isFeatured: product.isFeatured,
     isTrending: product.isTrending,
     isBestSeller: product.isBestSeller,
@@ -101,6 +104,14 @@ function normalizeDiscountType(value: string): ProductDiscountType {
   }
 
   return 'none';
+}
+
+function normalizePaymentPolicy(value: string | undefined): ProductPaymentPolicy {
+  if (value === 'PREPAID_ONLY') {
+    return 'PREPAID_ONLY';
+  }
+
+  return 'POSTPAID';
 }
 
 function calculateDiscountedPrice(price: number, discountType: string, discountValue: number): number {
@@ -238,6 +249,7 @@ productRouter.get('/', requireAuth, requireMerchant, async (req, res) => {
           discountValue: product.discountValue,
           imageUrl: product.imageUrl,
           status: product.status,
+          paymentPolicy: product.paymentPolicy,
           isFeatured: product.isFeatured,
           isTrending: product.isTrending,
           isBestSeller: product.isBestSeller,
@@ -306,6 +318,7 @@ productRouter.post('/', requireAuth, requireMerchant, (req, res) => {
           discountType: parsed.data.discountType,
           discountValue: parsed.data.discountValue,
           status: parsed.data.status,
+          paymentPolicy: parsed.data.paymentPolicy,
           isFeatured: parsed.data.isFeatured,
           isTrending: parsed.data.isTrending,
           isBestSeller: parsed.data.isBestSeller,
@@ -330,6 +343,7 @@ productRouter.post('/', requireAuth, requireMerchant, (req, res) => {
             discountValue: product.discountValue,
             imageUrl: product.imageUrl,
             status: product.status,
+            paymentPolicy: product.paymentPolicy,
             isFeatured: product.isFeatured,
             isTrending: product.isTrending,
             isBestSeller: product.isBestSeller,
@@ -388,6 +402,9 @@ productRouter.put('/:productId', requireAuth, requireMerchant, (req, res) => {
       product.price = parsed.data.price;
       product.discountType = parsed.data.discountType;
       product.discountValue = parsed.data.discountValue;
+      if (parsed.data.paymentPolicy) {
+        product.paymentPolicy = parsed.data.paymentPolicy;
+      }
 
       if (req.file) {
         if (!req.file.buffer) {
@@ -422,6 +439,7 @@ productRouter.put('/:productId', requireAuth, requireMerchant, (req, res) => {
           discountValue: product.discountValue,
           imageUrl: product.imageUrl,
           status: product.status,
+          paymentPolicy: product.paymentPolicy,
           isFeatured: product.isFeatured,
           isTrending: product.isTrending,
           isBestSeller: product.isBestSeller,
@@ -469,14 +487,15 @@ productRouter.patch('/:productId/featured', requireAuth, requireMerchant, async 
 
     return res.status(200).json({
       product: toProductResponse({
-          _id: product._id,
-          title: product.title,
-          category: product.category,
-          price: product.price,
+        _id: product._id,
+        title: product.title,
+        category: product.category,
+        price: product.price,
         discountType: product.discountType,
         discountValue: product.discountValue,
         imageUrl: product.imageUrl,
         status: product.status,
+        paymentPolicy: product.paymentPolicy,
         isFeatured: product.isFeatured,
         isTrending: product.isTrending,
         isBestSeller: product.isBestSeller,
@@ -530,6 +549,7 @@ productRouter.patch('/:productId/trending', requireAuth, requireMerchant, async 
         discountValue: product.discountValue,
         imageUrl: product.imageUrl,
         status: product.status,
+        paymentPolicy: product.paymentPolicy,
         isFeatured: product.isFeatured,
         isTrending: product.isTrending,
         isBestSeller: product.isBestSeller,
@@ -583,6 +603,7 @@ productRouter.patch('/:productId/best-seller', requireAuth, requireMerchant, asy
         discountValue: product.discountValue,
         imageUrl: product.imageUrl,
         status: product.status,
+        paymentPolicy: product.paymentPolicy,
         isFeatured: product.isFeatured,
         isTrending: product.isTrending,
         isBestSeller: product.isBestSeller,
@@ -645,6 +666,7 @@ productRouter.patch('/:productId/flags', requireAuth, requireMerchant, async (re
         discountValue: product.discountValue,
         imageUrl: product.imageUrl,
         status: product.status,
+        paymentPolicy: product.paymentPolicy,
         isFeatured: product.isFeatured,
         isTrending: product.isTrending,
         isBestSeller: product.isBestSeller,

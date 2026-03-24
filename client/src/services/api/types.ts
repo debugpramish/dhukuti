@@ -2,6 +2,8 @@ export const PRODUCT_STATUS_VALUES = ['active', 'draft', 'archived'] as const;
 export type ProductStatus = (typeof PRODUCT_STATUS_VALUES)[number];
 export const DISCOUNT_TYPE_VALUES = ['none', 'percentage', 'fixed'] as const;
 export type DiscountType = (typeof DISCOUNT_TYPE_VALUES)[number];
+export const PRODUCT_PAYMENT_POLICY_VALUES = ['PREPAID_ONLY', 'POSTPAID'] as const;
+export type ProductPaymentPolicy = (typeof PRODUCT_PAYMENT_POLICY_VALUES)[number];
 export const COUPON_TYPE_VALUES = ['percentage', 'fixed'] as const;
 export type CouponType = (typeof COUPON_TYPE_VALUES)[number];
 
@@ -267,6 +269,7 @@ export type Product = {
   discountedPrice: number;
   discountAmount: number;
   hasDiscount: boolean;
+  paymentPolicy: ProductPaymentPolicy;
   imageUrl: string;
   status: ProductStatus;
   isFeatured: boolean;
@@ -290,6 +293,7 @@ export type ProductCreateInput = {
   price: number;
   discountType: DiscountType;
   discountValue: number;
+  paymentPolicy: ProductPaymentPolicy;
   status: ProductStatus;
   imageFile?: File;
   isFeatured?: boolean;
@@ -303,6 +307,7 @@ export type ProductUpdateInput = {
   price: number;
   discountType: DiscountType;
   discountValue: number;
+  paymentPolicy?: ProductPaymentPolicy;
   imageFile?: File;
 };
 

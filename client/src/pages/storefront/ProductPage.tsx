@@ -201,6 +201,9 @@ export default function ProductPage() {
             {product.discountPercent ? (
               <p className="text-sm font-medium text-emerald-700">{product.discountPercent}% OFF</p>
             ) : null}
+            <p className="text-sm font-medium text-slate-700">
+              {product.paymentPolicy === 'PREPAID_ONLY' ? 'Prepaid Required' : 'Cash on Delivery Available'}
+            </p>
           </div>
 
           {product.variants.length > 0 ? (

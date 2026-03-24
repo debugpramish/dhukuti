@@ -218,6 +218,8 @@ function normalizeProduct(payload: unknown): StorefrontProduct {
   const price = discountedPrice > 0 ? discountedPrice : basePrice;
   const discountPercent = compareAtPrice > price ? Math.round(((compareAtPrice - price) / compareAtPrice) * 100) : 0;
   const stock = Math.max(0, normalizeNumber(raw.stock || raw.quantity || raw.inventory, 0));
+  const paymentPolicyRaw = normalizeString(raw.paymentPolicy).toUpperCase();
+  const paymentPolicy = paymentPolicyRaw === 'PREPAID_ONLY' ? 'PREPAID_ONLY' : 'POSTPAID';
 
   const ratingAverage = normalizeNumber(
     (isRecord(raw.rating) ? raw.rating.average : undefined) || raw.averageRating || raw.rating,
@@ -247,6 +249,7 @@ function normalizeProduct(payload: unknown): StorefrontProduct {
     price,
     compareAtPrice: compareAtPrice > price ? compareAtPrice : undefined,
     discountPercent: discountPercent > 0 ? discountPercent : undefined,
+    paymentPolicy,
     thumbnail: images[0],
     images,
     rating: {
@@ -714,6 +717,7 @@ function normalizeCheckoutPolicy(payload: unknown): CheckoutPolicy | undefined {
     requiredPrepayRatio: Math.max(0, Math.min(1, normalizeNumber(payload.requiredPrepayRatio, 0))),
     requiredPrepayAmount: Math.max(0, normalizeNumber(payload.requiredPrepayAmount, 0)),
     reason: normalizeString(payload.reason) || 'Payment options adjusted for checkout safety.',
+    prepaidOnlyInCart: normalizeBoolean(payload.prepaidOnlyInCart, false),
   };
 }
 

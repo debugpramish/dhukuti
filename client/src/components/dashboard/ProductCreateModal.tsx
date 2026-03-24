@@ -9,9 +9,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   DISCOUNT_TYPE_VALUES,
+  PRODUCT_PAYMENT_POLICY_VALUES,
   PRODUCT_STATUS_VALUES,
   type DiscountType,
   type ProductCreateInput,
+  type ProductPaymentPolicy,
   type ProductStatus,
 } from '@/services/api/types';
 
@@ -22,6 +24,7 @@ const productCreateSchema = z.object({
   stock: z.number().min(0, 'Stock cannot be negative'),
   lowStockThreshold: z.number().min(0, 'Low stock threshold cannot be negative'),
   status: z.enum(PRODUCT_STATUS_VALUES),
+  paymentPolicy: z.enum(PRODUCT_PAYMENT_POLICY_VALUES),
   discountType: z.enum(DISCOUNT_TYPE_VALUES),
   discountValue: z.number().min(0, 'Discount value cannot be negative'),
   isFeatured: z.boolean(),
@@ -82,6 +85,14 @@ function formatDiscountType(discountType: DiscountType): string {
   return 'No discount';
 }
 
+function formatPaymentPolicy(policy: ProductPaymentPolicy): string {
+  if (policy === 'PREPAID_ONLY') {
+    return 'Prepaid Only';
+  }
+
+  return 'Postpaid (COD Allowed)';
+}
+
 export default function ProductCreateModal({
   open,
   isSubmitting,
@@ -98,19 +109,20 @@ export default function ProductCreateModal({
     formState: { errors },
   } = useForm<ProductCreateFormValues>({
     resolver: zodResolver(productCreateSchema),
-      defaultValues: {
-        title: '',
-        category: 'Uncategorized',
-        price: 0,
-        stock: 0,
-        lowStockThreshold: 5,
-        status: 'active',
-        discountType: 'none',
-        discountValue: 0,
-        isFeatured: false,
-        isTrending: false,
-        isBestSeller: false,
-        imageFile: undefined,
+    defaultValues: {
+      title: '',
+      category: 'Uncategorized',
+      price: 0,
+      stock: 0,
+      lowStockThreshold: 5,
+      status: 'active',
+      paymentPolicy: 'POSTPAID',
+      discountType: 'none',
+      discountValue: 0,
+      isFeatured: false,
+      isTrending: false,
+      isBestSeller: false,
+      imageFile: undefined,
     },
   });
 
@@ -128,6 +140,7 @@ export default function ProductCreateModal({
         stock: 0,
         lowStockThreshold: 5,
         status: 'active',
+        paymentPolicy: 'POSTPAID',
         discountType: 'none',
         discountValue: 0,
         isFeatured: false,
@@ -163,6 +176,7 @@ export default function ProductCreateModal({
       stock: values.stock,
       lowStockThreshold: values.lowStockThreshold,
       status: values.status,
+      paymentPolicy: values.paymentPolicy,
       discountType: values.discountType,
       discountValue: values.discountValue,
       isFeatured: values.isFeatured,
@@ -221,6 +235,25 @@ export default function ProductCreateModal({
             </select>
             {errors.status ? <p className="text-xs text-destructive">{errors.status.message}</p> : null}
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="new-product-payment-policy">Product Payment Policy</Label>
+          <select
+            id="new-product-payment-policy"
+            {...register('paymentPolicy')}
+            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+          >
+            {PRODUCT_PAYMENT_POLICY_VALUES.map((policy) => (
+              <option key={policy} value={policy}>
+                {formatPaymentPolicy(policy)}
+              </option>
+            ))}
+          </select>
+          {errors.paymentPolicy ? <p className="text-xs text-destructive">{errors.paymentPolicy.message}</p> : null}
+          <p className="text-xs text-muted-foreground">
+            Prepaid Only requires online payment at checkout. Postpaid allows COD and online payments.
+          </p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">

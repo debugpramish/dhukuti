@@ -2,10 +2,12 @@ import { httpRequest, unwrapData } from './httpClient';
 import { API_BASE_URL } from './httpClient';
 import {
   DISCOUNT_TYPE_VALUES,
+  PRODUCT_PAYMENT_POLICY_VALUES,
   PRODUCT_STATUS_VALUES,
   type ProductCreateInput,
   type Product,
   type DiscountType,
+  type ProductPaymentPolicy,
   type ProductStatus,
   type ProductUpdateInput,
   type ProductVariant,
@@ -33,6 +35,19 @@ function isDiscountType(value: string): value is DiscountType {
 function normalizeDiscountType(discountType: string): DiscountType {
   const normalized = typeof discountType === 'string' ? discountType.toLowerCase() : '';
   return isDiscountType(normalized) ? normalized : 'none';
+}
+
+function isProductPaymentPolicy(value: string): value is ProductPaymentPolicy {
+  return PRODUCT_PAYMENT_POLICY_VALUES.some((policy) => policy === value);
+}
+
+function normalizePaymentPolicy(paymentPolicy: string): ProductPaymentPolicy {
+  const normalized = typeof paymentPolicy === 'string' ? paymentPolicy.trim().toUpperCase() : '';
+  if (normalized === 'COD_ALLOWED') {
+    return 'POSTPAID';
+  }
+
+  return isProductPaymentPolicy(normalized) ? normalized : 'POSTPAID';
 }
 
 function calculateDiscountedPrice(price: number, discountType: DiscountType, discountValue: number): number {
@@ -83,6 +98,7 @@ function normalizeProduct(product: Product): Product {
     discountedPrice: normalizedDiscountedPrice,
     discountAmount: normalizedDiscountAmount,
     hasDiscount: Boolean(product.hasDiscount ?? normalizedDiscountAmount > 0),
+    paymentPolicy: normalizePaymentPolicy(product.paymentPolicy),
     status: normalizeStatus(product.status),
     imageUrl: normalizeProductImageUrl(product.imageUrl, product.title, API_BASE_URL),
     isFeatured: Boolean(product.isFeatured),
@@ -119,6 +135,7 @@ export async function createProduct(payload: ProductCreateInput): Promise<Produc
   formData.append('discountType', payload.discountType);
   formData.append('discountValue', String(payload.discountValue));
   formData.append('status', payload.status);
+  formData.append('paymentPolicy', payload.paymentPolicy);
   formData.append('isFeatured', String(Boolean(payload.isFeatured)));
   formData.append('isTrending', String(Boolean(payload.isTrending)));
   formData.append('isBestSeller', String(Boolean(payload.isBestSeller)));
@@ -146,6 +163,9 @@ export async function updateProduct(productId: string, payload: ProductUpdateInp
   formData.append('price', String(payload.price));
   formData.append('discountType', payload.discountType);
   formData.append('discountValue', String(payload.discountValue));
+  if (payload.paymentPolicy) {
+    formData.append('paymentPolicy', payload.paymentPolicy);
+  }
 
   if (payload.imageFile) {
     formData.append('image', payload.imageFile);

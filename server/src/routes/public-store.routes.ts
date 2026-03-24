@@ -14,6 +14,7 @@ import {
   recordAbandonedCheckout,
 } from '../services/abandoned-checkout.service';
 import { evaluateCodTrustPolicy, type CodTrustEvaluation } from '../services/cod-trust.service';
+import { getAllowedPaymentMethods } from '../services/payment-policy.service';
 import { trackStoreAnalyticsEventsSchema } from '../validation/analytics.validation';
 import { createStoreContactMessageSchema } from '../validation/store-contact.validation';
 import { createPublicOrderSchema, type CreatePublicOrderInput } from '../validation/public-order.validation';
@@ -79,6 +80,7 @@ function toProductResponse(product: {
   price: number;
   discountType: string;
   discountValue: number;
+  paymentPolicy?: string;
   imageUrl: string;
   status: string;
   isFeatured: boolean;
@@ -112,6 +114,7 @@ function toProductResponse(product: {
     discountedPrice,
     discountAmount,
     hasDiscount: discountAmount > 0,
+    paymentPolicy: product.paymentPolicy === 'PREPAID_ONLY' ? 'PREPAID_ONLY' : 'POSTPAID',
     imageUrl: product.imageUrl,
     status: product.status,
     isFeatured: product.isFeatured,
@@ -668,6 +671,8 @@ type CheckoutQuote = {
   paymentMethod: 'cod' | 'esewa' | 'khalti';
   total: number;
   appliedCouponId: string | null;
+  hasPrepaidOnlyItems: boolean;
+  productAllowedPaymentMethods: Array<'cod' | 'esewa' | 'khalti'>;
   stockAdjustments: Array<{
     productId: string;
     variantId: string;
@@ -677,6 +682,53 @@ type CheckoutQuote = {
     stockAfter: number;
   }>;
 };
+
+function toCheckoutPaymentMethods(methods: Array<'ONLINE' | 'COD'>): Array<'cod' | 'esewa' | 'khalti'> {
+  const mapped: Array<'cod' | 'esewa' | 'khalti'> = [];
+
+  if (methods.includes('ONLINE')) {
+    mapped.push('esewa', 'khalti');
+  }
+
+  if (methods.includes('COD')) {
+    mapped.push('cod');
+  }
+
+  return mapped;
+}
+
+function mergeCheckoutPolicies(params: {
+  trustPolicy: CodTrustEvaluation;
+  productAllowedPaymentMethods: Array<'cod' | 'esewa' | 'khalti'>;
+  hasPrepaidOnlyItems: boolean;
+}): CodTrustEvaluation {
+  const hasCodFromProductPolicy = params.productAllowedPaymentMethods.includes('cod');
+  const normalizedAllowedMethods: Array<'cod' | 'esewa' | 'khalti'> = hasCodFromProductPolicy
+    ? ['cod', 'esewa', 'khalti']
+    : ['esewa', 'khalti'];
+
+  if (params.hasPrepaidOnlyItems) {
+    return {
+      ...params.trustPolicy,
+      mode: 'prepaid_only',
+      allowedPaymentMethods: normalizedAllowedMethods,
+      codRequiresPrepay: false,
+      requiredPrepayRatio: 0,
+      requiredPrepayAmount: 0,
+      reason: 'Cash on Delivery is not available because your cart contains prepaid-only items.',
+    };
+  }
+
+  return {
+    ...params.trustPolicy,
+    mode: 'cod_allowed',
+    allowedPaymentMethods: normalizedAllowedMethods,
+    codRequiresPrepay: false,
+    requiredPrepayRatio: 0,
+    requiredPrepayAmount: 0,
+    reason: 'Cash on Delivery is available for postpaid products in this cart.',
+  };
+}
 
 function normalizeCheckoutPolicy(policy: CodTrustEvaluation) {
   return {
@@ -755,7 +807,7 @@ async function buildCheckoutQuote(params: {
     _id: { $in: productIds },
     ownerId: params.ownerId,
     status: 'active',
-  }).select({ _id: 1, title: 1, price: 1, discountType: 1, discountValue: 1, variants: 1 });
+  }).select({ _id: 1, title: 1, price: 1, discountType: 1, discountValue: 1, paymentPolicy: 1, variants: 1 });
 
   if (products.length !== productIds.length) {
     throw new CheckoutError(400, 'One or more products are unavailable for checkout');
@@ -805,6 +857,13 @@ async function buildCheckoutQuote(params: {
   }
 
   const stockAdjustments: CheckoutQuote['stockAdjustments'] = [];
+
+  const policyMethods = getAllowedPaymentMethods(
+    products.map((product) => ({ paymentPolicy: product.paymentPolicy })),
+  );
+  const hasPrepaidOnlyItems = !policyMethods.includes('COD');
+  const productAllowedPaymentMethods = toCheckoutPaymentMethods(policyMethods);
+
   let subtotal = 0;
   let subtotalAfterProductDiscount = 0;
   const orderItems: CheckoutQuote['items'] = [];
@@ -930,6 +989,8 @@ async function buildCheckoutQuote(params: {
     paymentMethod: params.paymentMethod,
     total,
     appliedCouponId,
+    hasPrepaidOnlyItems,
+    productAllowedPaymentMethods,
     stockAdjustments,
   };
 }
@@ -1110,6 +1171,7 @@ publicStoreRouter.get('/stores/:slug/products', async (req, res) => {
           price: product.price,
           discountType: product.discountType,
           discountValue: product.discountValue,
+          paymentPolicy: product.paymentPolicy,
           imageUrl: product.imageUrl,
           status: product.status,
           isFeatured: product.isFeatured,
@@ -1188,6 +1250,7 @@ publicStoreRouter.get('/stores/:slug/products/:productSlug', async (req, res) =>
         price: product.price,
         discountType: product.discountType,
         discountValue: product.discountValue,
+        paymentPolicy: product.paymentPolicy,
         imageUrl: product.imageUrl,
         status: product.status,
         isFeatured: product.isFeatured,
@@ -1483,6 +1546,18 @@ publicStoreRouter.post(
         customerId: customer._id.toString(),
         orderTotal: quote.total,
       });
+      const effectivePolicy = mergeCheckoutPolicies({
+        trustPolicy: policy,
+        productAllowedPaymentMethods: quote.productAllowedPaymentMethods,
+        hasPrepaidOnlyItems: quote.hasPrepaidOnlyItems,
+      });
+
+      if (!isPaymentMethodAllowed(effectivePolicy, provider)) {
+        return res.status(400).json({
+          message: effectivePolicy.reason,
+          policy: normalizeCheckoutPolicy(effectivePolicy),
+        });
+      }
 
       await StoreAnalyticsEventModel.create({
         ownerId: store.ownerId,
@@ -1564,7 +1639,7 @@ publicStoreRouter.post(
           codFee: quote.codFee,
           paymentMethod: quote.paymentMethod,
           total: quote.total,
-          policy: normalizeCheckoutPolicy(policy),
+          policy: normalizeCheckoutPolicy(effectivePolicy),
         },
       });
     } catch (error) {
@@ -1673,12 +1748,17 @@ publicStoreRouter.post('/stores/:slug/orders/preview', resolveStore, requireAuth
       customerId: req.customerId,
       orderTotal: quote.total,
     });
+    const effectivePolicy = mergeCheckoutPolicies({
+      trustPolicy: policy,
+      productAllowedPaymentMethods: quote.productAllowedPaymentMethods,
+      hasPrepaidOnlyItems: quote.hasPrepaidOnlyItems,
+    });
 
     let effectiveQuote = quote;
     let requestedPaymentAdjusted = false;
-    if (!isPaymentMethodAllowed(policy, quote.paymentMethod)) {
+    if (!isPaymentMethodAllowed(effectivePolicy, quote.paymentMethod)) {
       requestedPaymentAdjusted = true;
-      const fallbackPaymentMethod = getFallbackPaymentMethod(policy);
+      const fallbackPaymentMethod = getFallbackPaymentMethod(effectivePolicy);
       effectiveQuote = await buildCheckoutQuote({
         ownerId: store.ownerId.toString(),
         items: parsed.data.items,
@@ -1720,9 +1800,9 @@ publicStoreRouter.post('/stores/:slug/orders/preview', resolveStore, requireAuth
         codFee: effectiveQuote.codFee,
         paymentMethod: effectiveQuote.paymentMethod,
         total: effectiveQuote.total,
-        policy: normalizeCheckoutPolicy(policy),
+        policy: normalizeCheckoutPolicy(effectivePolicy),
       },
-      ...(requestedPaymentAdjusted ? { message: policy.reason } : {}),
+      ...(requestedPaymentAdjusted ? { message: effectivePolicy.reason } : {}),
     });
   } catch (error) {
     if (error instanceof CheckoutError) {
@@ -1784,11 +1864,16 @@ publicStoreRouter.post('/stores/:slug/orders', resolveStore, requireAuth, requir
       customerId: customer._id.toString(),
       orderTotal: quote.total,
     });
+    const effectivePolicy = mergeCheckoutPolicies({
+      trustPolicy: policy,
+      productAllowedPaymentMethods: quote.productAllowedPaymentMethods,
+      hasPrepaidOnlyItems: quote.hasPrepaidOnlyItems,
+    });
 
-    if (!isPaymentMethodAllowed(policy, quote.paymentMethod)) {
+    if (!isPaymentMethodAllowed(effectivePolicy, quote.paymentMethod)) {
       return res.status(400).json({
-        message: policy.reason,
-        policy: normalizeCheckoutPolicy(policy),
+        message: effectivePolicy.reason,
+        policy: normalizeCheckoutPolicy(effectivePolicy),
       });
     }
 
@@ -1953,7 +2038,7 @@ publicStoreRouter.post('/stores/:slug/orders', resolveStore, requireAuth, requir
           variantName?: string;
         }>,
       }),
-      policy: normalizeCheckoutPolicy(policy),
+      policy: normalizeCheckoutPolicy(effectivePolicy),
     });
   } catch (error) {
     if (error instanceof CheckoutError) {

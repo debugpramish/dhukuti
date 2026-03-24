@@ -7,10 +7,18 @@ import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { DISCOUNT_TYPE_VALUES, type DiscountType, type Product, type ProductUpdateInput } from '@/services/api/types';
+import {
+  DISCOUNT_TYPE_VALUES,
+  PRODUCT_PAYMENT_POLICY_VALUES,
+  type DiscountType,
+  type Product,
+  type ProductPaymentPolicy,
+  type ProductUpdateInput,
+} from '@/services/api/types';
 
 const productEditSchema = z.object({
   price: z.number().min(0.01, 'Price must be greater than zero.'),
+  paymentPolicy: z.enum(PRODUCT_PAYMENT_POLICY_VALUES),
   discountType: z.enum(DISCOUNT_TYPE_VALUES),
   discountValue: z.number().min(0, 'Discount value cannot be negative.'),
   imageFile: z
@@ -74,6 +82,14 @@ function formatDiscountType(discountType: DiscountType): string {
   return 'No discount';
 }
 
+function formatPaymentPolicy(policy: ProductPaymentPolicy): string {
+  if (policy === 'PREPAID_ONLY') {
+    return 'Prepaid Only';
+  }
+
+  return 'Postpaid (COD Allowed)';
+}
+
 export default function ProductEditModal({
   product,
   open,
@@ -93,6 +109,7 @@ export default function ProductEditModal({
     resolver: zodResolver(productEditSchema),
     defaultValues: {
       price: 0,
+      paymentPolicy: 'POSTPAID',
       discountType: 'none',
       discountValue: 0,
       imageFile: undefined,
@@ -111,6 +128,7 @@ export default function ProductEditModal({
 
     reset({
       price: product.price,
+      paymentPolicy: product.paymentPolicy,
       discountType: product.discountType,
       discountValue: product.discountValue,
       imageFile: undefined,
@@ -147,6 +165,7 @@ export default function ProductEditModal({
   const submitHandler = handleSubmit(async (values) => {
     await onSubmit({
       price: values.price,
+      paymentPolicy: values.paymentPolicy,
       discountType: values.discountType,
       discountValue: values.discountValue,
       imageFile: values.imageFile,
@@ -182,6 +201,22 @@ export default function ProductEditModal({
             <p className="text-xs text-muted-foreground">
               Current value: <span className="font-medium">{formatCurrency(product.price)}</span>
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="product-payment-policy">Product Payment Policy</Label>
+            <select
+              id="product-payment-policy"
+              {...register('paymentPolicy')}
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            >
+              {PRODUCT_PAYMENT_POLICY_VALUES.map((policy) => (
+                <option key={policy} value={policy}>
+                  {formatPaymentPolicy(policy)}
+                </option>
+              ))}
+            </select>
+            {errors.paymentPolicy ? <p className="text-xs text-destructive">{errors.paymentPolicy.message}</p> : null}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">

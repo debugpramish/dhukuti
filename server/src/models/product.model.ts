@@ -4,6 +4,8 @@ export const PRODUCT_STATUS_VALUES = ['active', 'draft', 'archived'] as const;
 export type ProductStatus = (typeof PRODUCT_STATUS_VALUES)[number];
 export const PRODUCT_DISCOUNT_TYPE_VALUES = ['none', 'percentage', 'fixed'] as const;
 export type ProductDiscountType = (typeof PRODUCT_DISCOUNT_TYPE_VALUES)[number];
+export const PRODUCT_PAYMENT_POLICY_VALUES = ['PREPAID_ONLY', 'POSTPAID'] as const;
+export type ProductPaymentPolicy = (typeof PRODUCT_PAYMENT_POLICY_VALUES)[number];
 
 export interface ProductVariant {
   _id: Types.ObjectId;
@@ -23,6 +25,7 @@ export interface ProductDocument extends Document {
   discountValue: number;
   imageUrl: string;
   status: ProductStatus;
+  paymentPolicy: ProductPaymentPolicy;
   isFeatured: boolean;
   isTrending: boolean;
   isBestSeller: boolean;
@@ -79,6 +82,12 @@ const productSchema = new mongoose.Schema<ProductDocument>(
       type: String,
       enum: PRODUCT_STATUS_VALUES,
       default: 'active',
+    },
+    paymentPolicy: {
+      type: String,
+      enum: PRODUCT_PAYMENT_POLICY_VALUES,
+      default: 'POSTPAID',
+      index: true,
     },
     isFeatured: {
       type: Boolean,

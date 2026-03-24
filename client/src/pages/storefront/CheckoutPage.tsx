@@ -10,6 +10,7 @@ import {
   previewCheckoutBill,
   verifyStorePayment,
 } from '@/features/storefront/api/storefrontApi';
+import { cartContainsPrepaidOnlyItems } from '@/features/storefront/payment-policy';
 import { formatCurrency } from '@/features/storefront/utils';
 import type {
   CheckoutBill,
@@ -103,15 +104,31 @@ export default function CheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const checkoutPolicy = previewBill?.policy;
-  const availablePaymentMethods = useMemo(() => {
-    if (!checkoutPolicy) {
-      return PAYMENT_METHODS;
-    }
+  const hasPrepaidOnlyItemsInCart = useMemo(() => cartContainsPrepaidOnlyItems(items), [items]);
+  const prepaidRestrictionMessage = 'Cash on Delivery is not available because your cart contains prepaid-only items.';
+  const paymentMethodOptions = useMemo(
+    () =>
+      PAYMENT_METHODS.map((method) => {
+        let disabled = false;
 
-    const allowed = new Set<CheckoutPaymentMethod>(checkoutPolicy.allowedPaymentMethods);
-    const filtered = PAYMENT_METHODS.filter((method) => allowed.has(method.value as CheckoutPaymentMethod));
-    return filtered.length > 0 ? filtered : PAYMENT_METHODS;
-  }, [checkoutPolicy]);
+        if (method.value === 'cod' && hasPrepaidOnlyItemsInCart) {
+          disabled = true;
+        }
+
+        if (checkoutPolicy) {
+          const allowed = new Set<CheckoutPaymentMethod>(checkoutPolicy.allowedPaymentMethods);
+          if (!allowed.has(method.value as CheckoutPaymentMethod)) {
+            disabled = true;
+          }
+        }
+
+        return {
+          ...method,
+          disabled,
+        };
+      }),
+    [checkoutPolicy, hasPrepaidOnlyItemsInCart],
+  );
 
   useEffect(() => {
     if (shippingMethods.length > 0) {
@@ -126,12 +143,13 @@ export default function CheckoutPage() {
   }, [couponCode, paymentMethod, shippingAddress, items]);
 
   useEffect(() => {
-    if (availablePaymentMethods.some((method) => method.value === paymentMethod)) {
+    if (paymentMethodOptions.some((method) => method.value === paymentMethod && !method.disabled)) {
       return;
     }
 
-    setPaymentMethod(availablePaymentMethods[0]?.value ?? 'esewa');
-  }, [availablePaymentMethods, paymentMethod]);
+    const fallback = paymentMethodOptions.find((method) => !method.disabled)?.value ?? 'esewa';
+    setPaymentMethod(fallback);
+  }, [paymentMethodOptions, paymentMethod]);
 
   const buildCheckoutPayload = (): CheckoutPayload => ({
     items: items.map((item) => ({
@@ -477,17 +495,27 @@ export default function CheckoutPage() {
 
           {currentStep === 2 ? (
             <div className="space-y-3">
-              {availablePaymentMethods.map((method) => (
-                <label key={method.value} className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 text-sm">
+              {paymentMethodOptions.map((method) => (
+                <label
+                  key={method.value}
+                  className={`flex items-center gap-2 rounded-xl border p-3 text-sm ${method.disabled ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400' : 'cursor-pointer border-slate-200 bg-white'}`}
+                >
                   <input
                     type="radio"
                     name="payment-method"
                     checked={paymentMethod === method.value}
                     onChange={() => setPaymentMethod(method.value)}
+                    disabled={method.disabled}
                   />
                   <span className="font-medium text-slate-900">{method.label}</span>
                 </label>
               ))}
+
+              {hasPrepaidOnlyItemsInCart ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                  {prepaidRestrictionMessage}
+                </div>
+              ) : null}
 
               {checkoutPolicy ? (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
@@ -545,6 +573,9 @@ export default function CheckoutPage() {
                 <p className="text-slate-600">Payment: {PAYMENT_METHODS.find((item) => item.value === paymentMethod)?.label}</p>
                 {checkoutPolicy ? (
                   <p className="mt-1 text-xs text-slate-500">{checkoutPolicy.reason}</p>
+                ) : null}
+                {hasPrepaidOnlyItemsInCart ? (
+                  <p className="mt-1 text-xs text-amber-700">{prepaidRestrictionMessage}</p>
                 ) : null}
                 {paymentMethod !== 'cod' ? (
                   <p className={`mt-1 text-xs ${paymentVerified ? 'text-emerald-700' : 'text-amber-700'}`}>

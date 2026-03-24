@@ -5,6 +5,7 @@ import { Minus, Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { fetchStorefrontStore, validateCoupon } from '@/features/storefront/api/storefrontApi';
+import { cartContainsPrepaidOnlyItems } from '@/features/storefront/payment-policy';
 import { formatCurrency, getDeliveryEstimate } from '@/features/storefront/utils';
 import { buildProductPlaceholderImage } from '@/lib/image';
 import { getCartItemCount, useStorefrontCartStore } from '@/stores/storefront-cart-store';
@@ -44,6 +45,7 @@ export default function CartPage() {
   const estimatedTotal = useMemo(() => {
     return Math.max(0, cartTotal - couponDiscount + estimatedShipping);
   }, [cartTotal, couponDiscount, estimatedShipping]);
+  const hasPrepaidOnlyItemsInCart = useMemo(() => cartContainsPrepaidOnlyItems(items), [items]);
 
   const handleApplyCoupon = async () => {
     setCouponLoading(true);
@@ -200,6 +202,12 @@ export default function CartPage() {
           <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
             Estimated delivery by {getDeliveryEstimate(5)}.
           </div>
+
+          {hasPrepaidOnlyItemsInCart ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              Cash on Delivery is not available because your cart contains prepaid-only items.
+            </div>
+          ) : null}
 
           <Link
             to="/checkout"

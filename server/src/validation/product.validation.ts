@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { PRODUCT_DISCOUNT_TYPE_VALUES, PRODUCT_STATUS_VALUES } from '../models/product.model';
+import { PRODUCT_DISCOUNT_TYPE_VALUES, PRODUCT_PAYMENT_POLICY_VALUES, PRODUCT_STATUS_VALUES } from '../models/product.model';
 
 function parseNumberInput(value: unknown): unknown {
   if (typeof value === 'number') {
@@ -28,6 +28,20 @@ function parseBooleanInput(value: unknown): unknown {
 }
 
 const discountTypeSchema = z.enum(PRODUCT_DISCOUNT_TYPE_VALUES);
+const paymentPolicySchema = z.enum(PRODUCT_PAYMENT_POLICY_VALUES);
+
+function parsePaymentPolicyInput(value: unknown): unknown {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  const normalized = value.trim().toUpperCase();
+  if (normalized === 'COD_ALLOWED') {
+    return 'POSTPAID';
+  }
+
+  return normalized;
+}
 
 const productDiscountSchema = z
   .object({
@@ -126,6 +140,7 @@ export const createProductSchema = z.object({
     },
     z.enum(PRODUCT_STATUS_VALUES).default('active'),
   ),
+  paymentPolicy: z.preprocess(parsePaymentPolicyInput, paymentPolicySchema).default('POSTPAID'),
   isFeatured: z.preprocess(parseBooleanInput, z.boolean()).default(false),
   isTrending: z.preprocess(parseBooleanInput, z.boolean()).default(false),
   isBestSeller: z.preprocess(parseBooleanInput, z.boolean()).default(false),
@@ -143,6 +158,7 @@ export const updateProductSchema = z
     ),
     discountType: productDiscountSchema.shape.discountType.default('none'),
     discountValue: productDiscountSchema.shape.discountValue.default(0),
+    paymentPolicy: z.preprocess(parsePaymentPolicyInput, paymentPolicySchema).optional(),
   })
   .superRefine((value, ctx) => {
     applyDiscountValidation(value.discountType, value.discountValue, ctx);

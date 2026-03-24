@@ -38,6 +38,7 @@ function toCardProduct(product: StorefrontProduct | LegacyProduct): StorefrontPr
       compareAtPrice && compareAtPrice > price
         ? Math.round(((compareAtPrice - price) / compareAtPrice) * 100)
         : undefined,
+    paymentPolicy: product.paymentPolicy === 'PREPAID_ONLY' ? 'PREPAID_ONLY' : 'POSTPAID',
     thumbnail: product.imageUrl,
     images: [product.imageUrl],
     rating: {
@@ -154,6 +155,9 @@ export default function ProductCard({ product, showFeaturedBadge = false, classN
             {normalized.title}
           </Link>
           <p className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-500">{normalized.category}</p>
+          <p className="mt-1 text-xs font-semibold text-slate-600">
+            {normalized.paymentPolicy === 'PREPAID_ONLY' ? 'Prepaid Required' : 'Cash on Delivery Available'}
+          </p>
         </div>
 
         <div className="flex items-center justify-between gap-2">

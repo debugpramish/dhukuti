@@ -53,6 +53,7 @@ export const useStorefrontCartStore = create<StorefrontCartState>()(
                 image: product.thumbnail,
                 quantity: safeQuantity,
                 availability: product.availability,
+                paymentPolicy: product.paymentPolicy,
                 variantId,
                 variantLabel,
               },
@@ -69,6 +70,7 @@ export const useStorefrontCartStore = create<StorefrontCartState>()(
                 compareAtPrice: product.compareAtPrice,
                 image: product.thumbnail,
                 availability: product.availability,
+                paymentPolicy: product.paymentPolicy,
                 quantity: Math.max(
                   1,
                   Math.min(MAX_ITEM_QUANTITY, item.quantity + safeQuantity),

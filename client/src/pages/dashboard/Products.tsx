@@ -33,6 +33,7 @@ export default function ProductsPage() {
     title: '',
     price: 0,
     imageUrl: '',
+    paymentPolicy: 'POSTPAID' as 'PREPAID_ONLY' | 'POSTPAID',
     isFeatured: false,
     isTrending: false,
     isBestSeller: false,
@@ -109,6 +110,7 @@ export default function ProductsPage() {
       title: '',
       price: 0,
       imageUrl: '',
+      paymentPolicy: 'POSTPAID',
       isFeatured: false,
       isTrending: false,
       isBestSeller: false,
@@ -135,6 +137,7 @@ export default function ProductsPage() {
       title: product.title,
       price: product.price,
       imageUrl: product.imageUrl || '',
+      paymentPolicy: product.paymentPolicy,
       isFeatured: product.isFeatured,
       isTrending: product.isTrending,
       isBestSeller: product.isBestSeller,
@@ -161,6 +164,7 @@ export default function ProductsPage() {
             price: formData.price,
             discountType: 'none',
             discountValue: 0,
+            paymentPolicy: formData.paymentPolicy,
           },
         });
       } else {
@@ -171,6 +175,7 @@ export default function ProductsPage() {
           discountType: 'none',
           discountValue: 0,
           status: 'active',
+          paymentPolicy: formData.paymentPolicy,
           isFeatured: formData.isFeatured,
           isTrending: formData.isTrending,
           isBestSeller: formData.isBestSeller,
@@ -508,6 +513,23 @@ export default function ProductsPage() {
                     className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-500"
                     placeholder="https://example.com/image.jpg"
                   />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Payment Policy</label>
+                  <select
+                    value={formData.paymentPolicy}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        paymentPolicy: e.target.value === 'PREPAID_ONLY' ? 'PREPAID_ONLY' : 'POSTPAID',
+                      })
+                    }
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-900"
+                  >
+                    <option value="POSTPAID">Postpaid (COD Allowed)</option>
+                    <option value="PREPAID_ONLY">Prepaid Only</option>
+                  </select>
                 </div>
               </div>
 
